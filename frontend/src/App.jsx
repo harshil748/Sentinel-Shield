@@ -13,6 +13,14 @@ function App() {
 	const [alerts, setAlerts] = useState([]);
 	const [threat, setThreat] = useState({ score: 0, level: "Low" });
 	const [leaderboard, setLeaderboard] = useState([]);
+
+	// Investigation hub state
+	const [invSymbol, setInvSymbol] = useState("");
+	const [invHandle, setInvHandle] = useState("");
+	const [invFrom, setInvFrom] = useState("");
+	const [invTo, setInvTo] = useState("");
+	const [invLimit, setInvLimit] = useState(100);
+	const [invResults, setInvResults] = useState([]);
 	const [selectedAlert, setSelectedAlert] = useState(null);
 	const [alertDetail, setAlertDetail] = useState(null);
 
@@ -47,6 +55,7 @@ function App() {
 	useEffect(() => {
 		if (data) {
 			const chartElem = document.getElementById("chart");
+			if (!chartElem) return;
 			chartElem.innerHTML = "";
 			const chart = LightweightCharts.createChart(chartElem, {
 				width: 600,
@@ -95,12 +104,56 @@ function App() {
 		}
 	}
 
+	// Investigation search
+	async function runInvestigation(e) {
+		e && e.preventDefault();
+		try {
+			const params = new URLSearchParams();
+			if (invSymbol.trim()) params.append("symbol", invSymbol.trim());
+			if (invHandle.trim()) params.append("handle", invHandle.trim());
+			if (invFrom.trim()) params.append("from_ts", invFrom);
+			if (invTo.trim()) params.append("to_ts", invTo);
+			if (invLimit) params.append("limit", invLimit);
+			const url = `http://127.0.0.1:8000/alerts?${params.toString()}`;
+			const res = await axios.get(url);
+			setInvResults(res.data || []);
+		} catch (err) {
+			console.error("Investigation error", err);
+			setInvResults([]);
+		}
+	}
+
+	// CSV export for investigation results
+	function downloadCSV() {
+		if (!invResults || invResults.length === 0) return;
+		const headers = Object.keys(invResults[0]);
+		const csvRows = [headers.join(",")];
+		for (const row of invResults) {
+			const vals = headers.map((h) => {
+				const v = row[h];
+				if (v === null || v === undefined) return "";
+				return `"${String(v).replace(/"/g, '""')}"`;
+			});
+			csvRows.push(vals.join(","));
+		}
+		const csv = csvRows.join("\n");
+		const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+		const url = URL.createObjectURL(blob);
+		const a = document.createElement("a");
+		a.href = url;
+		a.download = `alerts_export_${new Date().toISOString()}.csv`;
+		document.body.appendChild(a);
+		a.click();
+		a.remove();
+		URL.revokeObjectURL(url);
+	}
+
 	async function openAlertDetail(alert) {
 		setSelectedAlert(alert.id);
 		try {
 			const res = await axios.get(`http://127.0.0.1:8000/alerts/${alert.id}`);
 			setAlertDetail(res.data);
-			// draw deep-dive chart with marker
+			// deep chart
 			const chartElem = document.getElementById("deep_chart");
 			if (!chartElem) return;
 			chartElem.innerHTML = "";
@@ -109,20 +162,18 @@ function App() {
 				height: 300,
 			});
 			const series = chart.addLineSeries();
-			// for deep-dive fetch full recent history for symbol
 			const hist = await axios.get(
 				`http://127.0.0.1:8000/fetch_live?symbol=${encodeURIComponent(
 					alert.symbol
 				)}`
 			);
-			const times = (hist.data.timestamps || []).slice(-30);
-			const prices = (hist.data.recent_prices || []).slice(-30);
+			const times = (hist.data.timestamps || []).slice(-60);
+			const prices = (hist.data.recent_prices || []).slice(-60);
 			const pts = prices.map((p, i) => ({
 				time: Math.floor(new Date(times[i]).getTime() / 1000),
 				value: p,
 			}));
 			series.setData(pts);
-			// place marker at alert.time
 			const alertTime = Math.floor(new Date(alert.time).getTime() / 1000);
 			series.setMarkers([
 				{
@@ -146,10 +197,10 @@ function App() {
 	return (
 		<div
 			style={{
-				padding: "16px",
+				padding: 16,
 				display: "grid",
 				gridTemplateColumns: "2fr 1fr",
-				gap: "18px",
+				gap: 18,
 				fontFamily: "Inter, Arial",
 			}}>
 			<div>
@@ -158,10 +209,10 @@ function App() {
 						display: "flex",
 						justifyContent: "space-between",
 						alignItems: "center",
-						marginBottom: "12px",
+						marginBottom: 12,
 					}}>
 					<h1 style={{ margin: 0 }}>Sentinel Shield</h1>
-					<div style={{ width: 260 }}>
+					<div style={{ width: 320 }}>
 						<form
 							onSubmit={handleSubmit}
 							style={{ position: "relative", display: "flex" }}>
@@ -172,7 +223,7 @@ function App() {
 								placeholder='Type company or symbol'
 								style={{
 									flex: 1,
-									padding: "8px",
+									padding: 8,
 									borderRadius: "6px 0 0 6px",
 									border: "1px solid #ccc",
 								}}
@@ -242,56 +293,137 @@ function App() {
 					</>
 				)}
 
-				<h3 style={{ marginTop: 18 }}>Alert Feed</h3>
+				<h3 style={{ marginTop: 18 }}>Investigation Hub</h3>
 				<div
 					style={{
-						maxHeight: 340,
+						background: "#fafafa",
+						padding: 12,
+						borderRadius: 6,
+						marginBottom: 8,
+					}}>
+					<form
+						onSubmit={runInvestigation}
+						style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+						<input
+							placeholder='symbol (exact)'
+							value={invSymbol}
+							onChange={(e) => setInvSymbol(e.target.value)}
+							style={{
+								padding: 8,
+								borderRadius: 4,
+								border: "1px solid #ccc",
+								width: 160,
+							}}
+						/>
+						<input
+							placeholder='handle (source)'
+							value={invHandle}
+							onChange={(e) => setInvHandle(e.target.value)}
+							style={{
+								padding: 8,
+								borderRadius: 4,
+								border: "1px solid #ccc",
+								width: 160,
+							}}
+						/>
+						<input
+							type='datetime-local'
+							value={invFrom}
+							onChange={(e) => setInvFrom(e.target.value)}
+							style={{ padding: 8 }}
+						/>
+						<input
+							type='datetime-local'
+							value={invTo}
+							onChange={(e) => setInvTo(e.target.value)}
+							style={{ padding: 8 }}
+						/>
+						<input
+							type='number'
+							value={invLimit}
+							onChange={(e) => setInvLimit(e.target.value)}
+							style={{ width: 80, padding: 8 }}
+						/>
+						<button
+							style={{
+								padding: "8px 12px",
+								background: "#0b69ff",
+								color: "white",
+								border: "none",
+								borderRadius: 4,
+							}}>
+							Search
+						</button>
+						<button
+							type='button'
+							onClick={downloadCSV}
+							style={{
+								padding: "8px 12px",
+								background: "#2d9cdb",
+								color: "white",
+								border: "none",
+								borderRadius: 4,
+							}}>
+							Download CSV
+						</button>
+					</form>
+				</div>
+
+				<div
+					style={{
+						maxHeight: 320,
 						overflowY: "auto",
 						background: "#111",
 						color: "white",
 						padding: 12,
 						borderRadius: 6,
 					}}>
-					{alerts.length === 0 && <div>No alerts</div>}
-					<ul style={{ listStyle: "none", padding: 0, margin: 0 }}>
-						{alerts.map((a) => (
-							<li
-								key={a.id}
-								style={{
-									padding: 8,
-									borderBottom: "1px solid #222",
-									display: "flex",
-									justifyContent: "space-between",
-									alignItems: "center",
-								}}>
-								<div>
-									<div style={{ fontWeight: 600 }}>
-										{a.symbol}{" "}
-										<span style={{ color: "#f0ad4e", marginLeft: 8 }}>
-											{a.reason}
-										</span>
-									</div>
-									<div style={{ fontSize: 12, color: "#bbb" }}>
-										{a.time} • Source: {a.source_handle} • Trust:{" "}
-										{a.trust_score}
-									</div>
-								</div>
-								<div style={{ display: "flex", gap: 8 }}>
-									<button
-										onClick={() => openAlertDetail(a)}
-										style={{
-											padding: "6px 8px",
-											borderRadius: 6,
-											background: "#0b69ff",
-											color: "white",
-											border: "none",
-										}}>
-										Deep Dive
-									</button>
-								</div>
-							</li>
-						))}
-					</ul>
+					{invResults.length === 0 && (
+						<div style={{ color: "#ccc" }}>
+							No results. Use the Investigation Hub to query past alerts.
+						</div>
+					)}
+					<table
+						style={{
+							width: "100%",
+							borderCollapse: "collapse",
+							color: "white",
+						}}>
+						<thead>
+							<tr style={{ textAlign: "left", borderBottom: "1px solid #333" }}>
+								<th style={{ padding: 6 }}>Time</th>
+								<th style={{ padding: 6 }}>Symbol</th>
+								<th style={{ padding: 6 }}>Reason</th>
+								<th style={{ padding: 6 }}>Source</th>
+								<th style={{ padding: 6 }}>Trust</th>
+								<th style={{ padding: 6 }}>Actions</th>
+							</tr>
+						</thead>
+						<tbody>
+							{invResults.map((r) => (
+								<tr key={r.id} style={{ borderBottom: "1px solid #222" }}>
+									<td style={{ padding: 6 }}>{r.time}</td>
+									<td style={{ padding: 6 }}>{r.symbol}</td>
+									<td style={{ padding: 6 }}>{r.reason}</td>
+									<td style={{ padding: 6 }}>{r.source_handle}</td>
+									<td style={{ padding: 6 }}>{r.trust_score}</td>
+									<td style={{ padding: 6 }}>
+										<button
+											onClick={() => openAlertDetail(r)}
+											style={{
+												padding: "6px 8px",
+												borderRadius: 6,
+												background: "#0b69ff",
+												color: "white",
+												border: "none",
+											}}>
+											Deep Dive
+										</button>
+									</td>
+								</tr>
+							))}
+						</tbody>
+					</table>
 				</div>
 			</div>
 
@@ -356,7 +488,6 @@ function App() {
 				</div>
 			</aside>
 
-			{/* Deep-dive modal/panel */}
 			{selectedAlert && alertDetail && (
 				<div
 					style={{

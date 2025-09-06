@@ -30,10 +30,8 @@ engine = None
 if DATABASE_URL:
     engine = create_engine(DATABASE_URL, echo=False, future=True)
 
-# in-memory alert storage
 alerts = []
 
-# demo trust registry
 SEBI_REGISTERED_HANDLES = {
     "verified_broker_official": {
         "name": "Verified Broker Official",
@@ -210,34 +208,74 @@ async def fetch_live_alert(symbol: str = Query("RELIANCE.NSE", example="RELIANCE
 
 @app.get("/alerts")
 async def get_alerts(
-    symbol: str = None, handle: str = None, limit: int = 100, since_hours: int = 24
+    symbol: str = None,
+    handle: str = None,
+    limit: int = 100,
+    from_ts: str = None,
+    to_ts: str = None,
+    since_hours: int = None,
 ):
-    result = alerts
+    """
+    Filters:
+      - symbol: exact match (case-insensitive)
+      - handle: source_handle exact match
+      - from_ts / to_ts: ISO timestamps (inclusive)
+      - since_hours: relative filter (if provided)
+      - limit: max records returned (most recent)
+    """
+    result = alerts.copy()
+
     if symbol:
         result = [a for a in result if a["symbol"].lower() == symbol.lower()]
+
     if handle:
         result = [
             a for a in result if a.get("source_handle", "").lower() == handle.lower()
         ]
+
+    if from_ts:
+        try:
+            f = datetime.datetime.fromisoformat(from_ts)
+            result = [
+                a
+                for a in result
+                if datetime.datetime.fromisoformat(a["created_at"]) >= f
+            ]
+        except Exception:
+            raise HTTPException(
+                status_code=400, detail="Invalid from_ts format. Use ISO format."
+            )
+
+    if to_ts:
+        try:
+            t = datetime.datetime.fromisoformat(to_ts)
+            result = [
+                a
+                for a in result
+                if datetime.datetime.fromisoformat(a["created_at"]) <= t
+            ]
+        except Exception:
+            raise HTTPException(
+                status_code=400, detail="Invalid to_ts format. Use ISO format."
+            )
+
     if since_hours:
-        cutoff = datetime.datetime.utcnow() - datetime.timedelta(hours=since_hours)
-        filtered = []
-        for a in result:
-            try:
-                created = datetime.datetime.fromisoformat(a["created_at"])
-                if created >= cutoff:
-                    filtered.append(a)
-            except Exception:
-                pass
-        result = filtered
-    return result[-limit:]
+        cutoff = datetime.datetime.utcnow() - datetime.timedelta(hours=int(since_hours))
+        result = [
+            a
+            for a in result
+            if datetime.datetime.fromisoformat(a["created_at"]) >= cutoff
+        ]
+
+    # return most recent first up to limit
+    result_sorted = sorted(result, key=lambda x: x.get("created_at", ""), reverse=True)
+    return result_sorted[: int(limit)]
 
 
 @app.get("/alerts/{alert_id}")
 async def get_alert(alert_id: str):
     for a in alerts:
         if a.get("id") == alert_id:
-            # create mock social snippets related to alert (demo)
             social = [
                 {
                     "handle": a["source_handle"],
