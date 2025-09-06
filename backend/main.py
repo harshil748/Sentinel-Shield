@@ -21,18 +21,16 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# optional DB engine (not required for prototype)
 engine = None
 if DATABASE_URL:
     engine = create_engine(DATABASE_URL, echo=False, future=True)
 
-# in-memory alert storage for demo
 alerts = []
 
 
 async def fetch_twelvedata(symbol: str, interval: str = "1min", outputsize: int = 30):
     if not TD_API_KEY:
-        return None  # signal to use mock
+        return None
     url = "https://api.twelvedata.com/time_series"
     params = {
         "symbol": symbol,
@@ -56,6 +54,17 @@ def compute_ewma_anomaly(prices, span=10):
     return float(score), float(ewma.iloc[-1])
 
 
+def classify_risk(ewma_score: float, vol_ratio: float):
+    if abs(ewma_score) > 3 and vol_ratio > 3:
+        return "Pump-Dump Anomaly"
+    elif abs(ewma_score) > 3:
+        return "Insider Trading Spike"
+    elif vol_ratio > 3:
+        return "Unusual Volume Surge"
+    else:
+        return "Normal"
+
+
 @app.get("/health")
 async def health():
     return {"status": "ok"}
@@ -65,10 +74,6 @@ async def health():
 async def fetch_live(
     symbol: str = Query(..., example="RELIANCE.NSE"), interval: str = "1min"
 ):
-    """
-    Fetch recent time-series for `symbol` and return a simple anomaly score.
-    Uses TwelveData when TWELVEDATA_API_KEY is set. Otherwise returns mocked data.
-    """
     data = await fetch_twelvedata(symbol, interval=interval, outputsize=60)
     if data is None or "values" not in data:
         now = pd.Timestamp.now()
@@ -78,7 +83,7 @@ async def fetch_live(
         timestamps = rng.astype(str).tolist()
     else:
         vals = data["values"]
-        vals_sorted = list(reversed(vals))  # ensure chronological
+        vals_sorted = list(reversed(vals))
         prices = [float(v["close"]) for v in vals_sorted if "close" in v]
         volumes = [int(v.get("volume", 0)) for v in vals_sorted]
         timestamps = [v["datetime"] for v in vals_sorted]
@@ -92,6 +97,8 @@ async def fetch_live(
     )
     vol_ratio = float(vol_now / (vol_mean if vol_mean > 0 else 1))
 
+    risk_reason = classify_risk(ewma_score, vol_ratio)
+
     anomaly = {
         "symbol": symbol,
         "price": price_now,
@@ -99,8 +106,9 @@ async def fetch_live(
         "ewma": ewma_value,
         "ewma_zscore": ewma_score,
         "volume_ratio": vol_ratio,
-        "is_anomaly": bool(abs(ewma_score) > 3 or vol_ratio > 3),
-        "timestamps": timestamps[-5:],  # last 5 timestamps
+        "is_anomaly": risk_reason != "Normal",
+        "risk_reason": risk_reason,
+        "timestamps": timestamps[-5:],
         "recent_prices": prices[-5:],
         "recent_volumes": volumes[-5:],
     }
@@ -109,9 +117,6 @@ async def fetch_live(
 
 @app.get("/fetch_live_alert")
 async def fetch_live_alert(symbol: str = Query("RELIANCE.NSE", example="RELIANCE.NSE")):
-    """
-    Same as /fetch_live but logs anomaly events into the alert feed.
-    """
     data = await fetch_live(symbol)
     if data["is_anomaly"]:
         alerts.append(
@@ -120,7 +125,7 @@ async def fetch_live_alert(symbol: str = Query("RELIANCE.NSE", example="RELIANCE
                 "price": data["price"],
                 "volume": data["volume"],
                 "time": data["timestamps"][-1],
-                "reason": f"EWMA z={data['ewma_zscore']:.2f}, vol ratio={data['volume_ratio']:.2f}",
+                "reason": data["risk_reason"],
             }
         )
     return data
@@ -128,18 +133,11 @@ async def fetch_live_alert(symbol: str = Query("RELIANCE.NSE", example="RELIANCE
 
 @app.get("/alerts")
 async def get_alerts():
-    """
-    Return last 10 anomaly alerts.
-    """
     return alerts[-10:]
 
 
 @app.get("/threat_score")
 async def threat_score():
-    """
-    Compute a simple market-wide threat score from recent alerts.
-    Score = min(100, len(alerts) * 10).
-    """
     score = min(100, len(alerts) * 10)
     level = "Low"
     if score >= 70:

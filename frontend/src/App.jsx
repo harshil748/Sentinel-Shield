@@ -12,7 +12,6 @@ function App() {
 	const [alerts, setAlerts] = useState([]);
 	const [threat, setThreat] = useState({ score: 0, level: "Low" });
 
-	// Fetch function
 	async function fetchAll(sym) {
 		try {
 			const res = await axios.get(
@@ -30,14 +29,12 @@ function App() {
 		}
 	}
 
-	// auto-refresh loop
 	useEffect(() => {
 		fetchAll(symbol);
 		const id = setInterval(() => fetchAll(symbol), 10000);
 		return () => clearInterval(id);
 	}, [symbol]);
 
-	// draw chart
 	useEffect(() => {
 		if (data) {
 			const chartElem = document.getElementById("chart");
@@ -55,7 +52,6 @@ function App() {
 		}
 	}, [data]);
 
-	// handle search submit
 	function handleSubmit(e) {
 		e.preventDefault();
 		if (input.trim() !== "") {
@@ -110,7 +106,8 @@ function App() {
 							{data.volume}
 						</p>
 						<p>
-							EWMA Z-Score: {data.ewma_zscore.toFixed(2)} | Volume Ratio:{" "}
+							Risk: <b>{data.risk_reason}</b> | EWMA Z-Score:{" "}
+							{data.ewma_zscore.toFixed(2)} | Volume Ratio:{" "}
 							{data.volume_ratio.toFixed(2)} | Anomaly:{" "}
 							{data.is_anomaly ? "⚠️ Yes" : "✅ No"}
 						</p>
