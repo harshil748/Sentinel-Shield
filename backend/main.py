@@ -5,12 +5,21 @@ import httpx
 import pandas as pd
 import numpy as np
 from sqlalchemy import create_engine
+from fastapi.middleware.cors import CORSMiddleware
 
 load_dotenv()
 TD_API_KEY = os.getenv("TWELVEDATA_API_KEY", "")
 DATABASE_URL = os.getenv("DATABASE_URL")
 
 app = FastAPI(title="Sentinel Shield - Backend")
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 # optional DB engine (we won't require migrations for prototype)
 engine = None
