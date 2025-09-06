@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import axios from "axios";
-import { createChart } from "lightweight-charts";
+import * as LightweightCharts from "lightweight-charts";
 
 function App() {
 	const [data, setData] = useState(null);
@@ -26,18 +26,26 @@ function App() {
 		if (data) {
 			const chartElem = document.getElementById("chart");
 			chartElem.innerHTML = ""; // clear old chart
-			const chart = createChart(chartElem, { width: 600, height: 300 });
+
+			const chart = LightweightCharts.createChart(chartElem, {
+				width: 600,
+				height: 300,
+			});
+
 			const lineSeries = chart.addLineSeries();
-			const prices = data.recent_prices.map((p, i) => ({
-				time: i,
+
+			const points = data.recent_prices.map((p, i) => ({
+				// use real timestamps converted to UNIX seconds
+				time: Math.floor(new Date(data.timestamps[i]).getTime() / 1000),
 				value: p,
 			}));
-			lineSeries.setData(prices);
+
+			lineSeries.setData(points);
 		}
 	}, [data]);
 
 	return (
-		<div className='p-4'>
+		<div style={{ padding: "20px" }}>
 			<h1>Sentinel Shield Dashboard</h1>
 			{data ? (
 				<div>
