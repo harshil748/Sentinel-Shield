@@ -4,7 +4,6 @@ import { createChart } from "lightweight-charts";
 
 function App() {
 	const [data, setData] = useState(null);
-	const [chart, setChart] = useState(null);
 
 	useEffect(() => {
 		async function fetchData() {
@@ -12,29 +11,30 @@ function App() {
 				const res = await axios.get(
 					"http://127.0.0.1:8000/fetch_live?symbol=RELIANCE.NSE"
 				);
+				console.log("Fetched data:", res.data);
 				setData(res.data);
 			} catch (e) {
 				console.error("Error fetching:", e);
 			}
 		}
 		fetchData();
-		const id = setInterval(fetchData, 10000); // refresh every 10s
+		const id = setInterval(fetchData, 10000);
 		return () => clearInterval(id);
 	}, []);
 
 	useEffect(() => {
-		if (data && !chart) {
+		if (data) {
 			const chartElem = document.getElementById("chart");
-			const c = createChart(chartElem, { width: 600, height: 300 });
-			const lineSeries = c.addLineSeries();
+			chartElem.innerHTML = ""; // clear old chart
+			const chart = createChart(chartElem, { width: 600, height: 300 });
+			const lineSeries = chart.addLineSeries();
 			const prices = data.recent_prices.map((p, i) => ({
 				time: i,
 				value: p,
 			}));
 			lineSeries.setData(prices);
-			setChart(c);
 		}
-	}, [data, chart]);
+	}, [data]);
 
 	return (
 		<div className='p-4'>
@@ -49,7 +49,14 @@ function App() {
 						{data.volume_ratio.toFixed(2)} | Anomaly:{" "}
 						{data.is_anomaly ? "⚠️ Yes" : "✅ No"}
 					</p>
-					<div id='chart' style={{ marginTop: "20px" }}></div>
+					<div
+						id='chart'
+						style={{
+							width: "600px",
+							height: "300px",
+							marginTop: "20px",
+							background: "#fff",
+						}}></div>
 				</div>
 			) : (
 				<p>Loading…</p>
