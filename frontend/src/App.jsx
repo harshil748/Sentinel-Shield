@@ -6,32 +6,38 @@ import { CircularProgressbar, buildStyles } from "react-circular-progressbar";
 import "react-circular-progressbar/dist/styles.css";
 
 function App() {
+	const [symbol, setSymbol] = useState("RELIANCE.NSE");
+	const [input, setInput] = useState("RELIANCE.NSE");
 	const [data, setData] = useState(null);
 	const [alerts, setAlerts] = useState([]);
 	const [threat, setThreat] = useState({ score: 0, level: "Low" });
 
-	useEffect(() => {
-		async function fetchData() {
-			try {
-				const res = await axios.get(
-					"http://127.0.0.1:8000/fetch_live_alert?symbol=RELIANCE.NSE"
-				);
-				setData(res.data);
+	// Fetch function
+	async function fetchAll(sym) {
+		try {
+			const res = await axios.get(
+				`http://127.0.0.1:8000/fetch_live_alert?symbol=${sym}`
+			);
+			setData(res.data);
 
-				const alertRes = await axios.get("http://127.0.0.1:8000/alerts");
-				setAlerts(alertRes.data);
+			const alertRes = await axios.get("http://127.0.0.1:8000/alerts");
+			setAlerts(alertRes.data);
 
-				const threatRes = await axios.get("http://127.0.0.1:8000/threat_score");
-				setThreat(threatRes.data);
-			} catch (e) {
-				console.error("Error fetching:", e);
-			}
+			const threatRes = await axios.get("http://127.0.0.1:8000/threat_score");
+			setThreat(threatRes.data);
+		} catch (e) {
+			console.error("Error fetching:", e);
 		}
-		fetchData();
-		const id = setInterval(fetchData, 10000);
-		return () => clearInterval(id);
-	}, []);
+	}
 
+	// auto-refresh loop
+	useEffect(() => {
+		fetchAll(symbol);
+		const id = setInterval(() => fetchAll(symbol), 10000);
+		return () => clearInterval(id);
+	}, [symbol]);
+
+	// draw chart
 	useEffect(() => {
 		if (data) {
 			const chartElem = document.getElementById("chart");
@@ -49,6 +55,14 @@ function App() {
 		}
 	}, [data]);
 
+	// handle search submit
+	function handleSubmit(e) {
+		e.preventDefault();
+		if (input.trim() !== "") {
+			setSymbol(input.trim());
+		}
+	}
+
 	return (
 		<div
 			style={{
@@ -59,6 +73,36 @@ function App() {
 			}}>
 			<div>
 				<h1>Sentinel Shield Dashboard</h1>
+
+				{/* Symbol search box */}
+				<form onSubmit={handleSubmit} style={{ marginBottom: "15px" }}>
+					<input
+						type='text'
+						value={input}
+						onChange={(e) => setInput(e.target.value)}
+						placeholder='Enter symbol e.g. TCS.NSE'
+						style={{
+							padding: "6px",
+							marginRight: "10px",
+							width: "200px",
+							borderRadius: "4px",
+							border: "1px solid #ccc",
+						}}
+					/>
+					<button
+						type='submit'
+						style={{
+							padding: "6px 12px",
+							borderRadius: "4px",
+							border: "none",
+							background: "#007bff",
+							color: "white",
+							cursor: "pointer",
+						}}>
+						Load
+					</button>
+				</form>
+
 				{data && (
 					<>
 						<p>
