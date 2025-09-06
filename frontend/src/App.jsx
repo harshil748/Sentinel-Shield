@@ -2,12 +2,14 @@ import { useEffect, useState } from "react";
 import axios from "axios";
 import * as LightweightCharts from "lightweight-charts";
 import { AlertTriangle } from "lucide-react";
+import { CircularProgressbar, buildStyles } from "react-circular-progressbar";
+import "react-circular-progressbar/dist/styles.css";
 
 function App() {
 	const [data, setData] = useState(null);
 	const [alerts, setAlerts] = useState([]);
+	const [threat, setThreat] = useState({ score: 0, level: "Low" });
 
-	// fetch live + push alert
 	useEffect(() => {
 		async function fetchData() {
 			try {
@@ -15,8 +17,12 @@ function App() {
 					"http://127.0.0.1:8000/fetch_live_alert?symbol=RELIANCE.NSE"
 				);
 				setData(res.data);
+
 				const alertRes = await axios.get("http://127.0.0.1:8000/alerts");
 				setAlerts(alertRes.data);
+
+				const threatRes = await axios.get("http://127.0.0.1:8000/threat_score");
+				setThreat(threatRes.data);
 			} catch (e) {
 				console.error("Error fetching:", e);
 			}
@@ -77,23 +83,53 @@ function App() {
 
 			<div
 				style={{
-					background: "#1e1e1e",
-					padding: "10px",
-					borderRadius: "8px",
-					color: "white",
+					display: "flex",
+					flexDirection: "column",
+					gap: "20px",
 				}}>
-				<h2>Alert Feed</h2>
-				{alerts.length === 0 && <p>No alerts yet</p>}
-				<ul>
-					{alerts.map((a, i) => (
-						<li key={i} style={{ marginBottom: "8px" }}>
-							<AlertTriangle size={16} color='orange' /> {a.symbol} anomaly at{" "}
-							{a.time} (Price {a.price})
-							<br />
-							<small>{a.reason}</small>
-						</li>
-					))}
-				</ul>
+				<div
+					style={{
+						background: "#1e1e1e",
+						padding: "10px",
+						borderRadius: "8px",
+						color: "white",
+					}}>
+					<h2>Alert Feed</h2>
+					{alerts.length === 0 && <p>No alerts yet</p>}
+					<ul>
+						{alerts.map((a, i) => (
+							<li key={i} style={{ marginBottom: "8px" }}>
+								<AlertTriangle size={16} color='orange' /> {a.symbol} anomaly at{" "}
+								{a.time} (Price {a.price})
+								<br />
+								<small>{a.reason}</small>
+							</li>
+						))}
+					</ul>
+				</div>
+
+				<div
+					style={{
+						background: "#1e1e1e",
+						padding: "20px",
+						borderRadius: "8px",
+						color: "white",
+					}}>
+					<h2>Market Threat Gauge</h2>
+					<CircularProgressbar
+						value={threat.score}
+						text={`${threat.level}`}
+						styles={buildStyles({
+							pathColor:
+								threat.level === "High"
+									? "red"
+									: threat.level === "Medium"
+									? "orange"
+									: "green",
+							textColor: "white",
+						})}
+					/>
+				</div>
 			</div>
 		</div>
 	);

@@ -132,3 +132,18 @@ async def get_alerts():
     Return last 10 anomaly alerts.
     """
     return alerts[-10:]
+
+
+@app.get("/threat_score")
+async def threat_score():
+    """
+    Compute a simple market-wide threat score from recent alerts.
+    Score = min(100, len(alerts) * 10).
+    """
+    score = min(100, len(alerts) * 10)
+    level = "Low"
+    if score >= 70:
+        level = "High"
+    elif score >= 40:
+        level = "Medium"
+    return {"score": score, "level": level}
