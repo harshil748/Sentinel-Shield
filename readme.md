@@ -315,15 +315,12 @@ We welcome contributions to enhance Sentinel Shield's capabilities:
 4. **Push to branch** (`git push origin feature/enhancement`)
 5. **Create Pull Request**
 
-## 📄 License
-
-This project is developed for the Securities Market Hackathon and is available under the MIT License.
 
 ## 👥 Team: Praesidio Analytics
 
 **Mission**: To protect market integrity through advanced AI surveillance
 
-**Contact**: [Your contact information]
+**Contact**: pharshil748@gmail.com
 
 ---
 
