@@ -16,18 +16,18 @@ function App() {
 	async function fetchAll(sym) {
 		try {
 			const res = await axios.get(
-				`http://127.0.0.1:8000/fetch_live_alert?symbol=${sym}`
+				`http://127.0.0.1:8000/fetch_live_alert?symbol=${encodeURIComponent(
+					sym
+				)}`
 			);
 			setData(res.data);
 
-			const alertRes = await axios.get("http://127.0.0.1:8000/alerts");
-			setAlerts(alertRes.data);
-
-			// placeholder until we add /threat_score
-			setThreat({
-				score: alerts.length * 10,
-				level: alerts.length > 3 ? "High" : "Low",
-			});
+			const [alertRes, threatRes] = await Promise.all([
+				axios.get("http://127.0.0.1:8000/alerts"),
+				axios.get("http://127.0.0.1:8000/threat_score"),
+			]);
+			setAlerts(alertRes.data || []);
+			setThreat(threatRes.data || { score: 0, level: "Low" });
 		} catch (e) {
 			console.error("Error fetching:", e);
 		}
@@ -48,8 +48,8 @@ function App() {
 				height: 300,
 			});
 			const lineSeries = chart.addLineSeries();
-			const points = data.recent_prices.map((p, i) => ({
-				time: Math.floor(new Date(data.timestamps[i]).getTime() / 1000),
+			const points = (data.recent_prices || []).map((p, i) => ({
+				time: Math.floor(new Date((data.timestamps || [])[i]).getTime() / 1000),
 				value: p,
 			}));
 			lineSeries.setData(points);
@@ -63,7 +63,9 @@ function App() {
 		if (value.length > 0) {
 			try {
 				const res = await axios.get(
-					`http://127.0.0.1:8000/search_symbols?query=${value}`
+					`http://127.0.0.1:8000/search_symbols?query=${encodeURIComponent(
+						value
+					)}`
 				);
 				if (res.data && res.data.data) {
 					setSuggestions(res.data.data.slice(0, 8));
@@ -80,8 +82,9 @@ function App() {
 	}
 
 	function handleSuggestionClick(s) {
-		setInput(`${s.symbol}.${s.exchange}`);
-		setSymbol(`${s.symbol}.${s.exchange}`);
+		const composed = `${s.symbol}.${s.exchange}`;
+		setInput(composed);
+		setSymbol(composed);
 		setSuggestions([]);
 	}
 
@@ -104,7 +107,6 @@ function App() {
 			<div>
 				<h1>Sentinel Shield Dashboard</h1>
 
-				{/* Autocomplete search */}
 				<form
 					onSubmit={handleSubmit}
 					style={{ marginBottom: "15px", position: "relative" }}>
@@ -116,7 +118,7 @@ function App() {
 						style={{
 							padding: "6px",
 							marginRight: "10px",
-							width: "250px",
+							width: "300px",
 							borderRadius: "4px",
 							border: "1px solid #ccc",
 						}}
@@ -133,6 +135,7 @@ function App() {
 						}}>
 						Load
 					</button>
+
 					{suggestions.length > 0 && (
 						<ul
 							style={{
@@ -141,8 +144,8 @@ function App() {
 								left: 0,
 								background: "white",
 								border: "1px solid #ccc",
-								width: "250px",
-								maxHeight: "200px",
+								width: "300px",
+								maxHeight: "240px",
 								overflowY: "auto",
 								zIndex: 10,
 								listStyle: "none",
@@ -154,8 +157,9 @@ function App() {
 									key={i}
 									onClick={() => handleSuggestionClick(s)}
 									style={{
-										padding: "6px",
+										padding: "8px",
 										cursor: "pointer",
+										borderBottom: "1px solid #eee",
 									}}>
 									{s.instrument_name} ({s.symbol}.{s.exchange})
 								</li>
@@ -171,8 +175,9 @@ function App() {
 							{data.volume}
 						</p>
 						<p>
-							EWMA Z-Score: {data.ewma_zscore.toFixed(2)} | Volume Ratio:{" "}
-							{data.volume_ratio.toFixed(2)} | Anomaly:{" "}
+							Risk: <b>{data.risk_reason || "N/A"}</b> | EWMA Z-Score:{" "}
+							{data.ewma_zscore?.toFixed(2)} | Volume Ratio:{" "}
+							{data.volume_ratio?.toFixed(2)} | Anomaly:{" "}
 							{data.is_anomaly ? "⚠️ Yes" : "✅ No"}
 						</p>
 						<div
@@ -201,9 +206,9 @@ function App() {
 					}}>
 					<h2>Alert Feed</h2>
 					{alerts.length === 0 && <p>No alerts yet</p>}
-					<ul>
+					<ul style={{ paddingLeft: 0 }}>
 						{alerts.map((a, i) => (
-							<li key={i} style={{ marginBottom: "8px" }}>
+							<li key={i} style={{ marginBottom: "8px", listStyle: "none" }}>
 								<AlertTriangle size={16} color='orange' /> {a.symbol} anomaly at{" "}
 								{a.time} (Price {a.price})
 								<br />
@@ -219,21 +224,26 @@ function App() {
 						padding: "20px",
 						borderRadius: "8px",
 						color: "white",
+						display: "flex",
+						justifyContent: "center",
+						alignItems: "center",
+						height: "160px",
 					}}>
-					<h2>Market Threat Gauge</h2>
-					<CircularProgressbar
-						value={threat.score}
-						text={`${threat.level}`}
-						styles={buildStyles({
-							pathColor:
-								threat.level === "High"
-									? "red"
-									: threat.level === "Medium"
-									? "orange"
-									: "green",
-							textColor: "white",
-						})}
-					/>
+					<div style={{ width: "120px" }}>
+						<CircularProgressbar
+							value={threat.score}
+							text={`${threat.level}`}
+							styles={buildStyles({
+								pathColor:
+									threat.level === "High"
+										? "red"
+										: threat.level === "Medium"
+										? "orange"
+										: "green",
+								textColor: "white",
+							})}
+						/>
+					</div>
 				</div>
 			</div>
 		</div>

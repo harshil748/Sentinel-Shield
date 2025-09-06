@@ -56,6 +56,17 @@ def compute_ewma_anomaly(prices, span=10):
     return float(score), float(ewma.iloc[-1])
 
 
+def classify_risk(ewma_score: float, vol_ratio: float):
+    if abs(ewma_score) > 3 and vol_ratio > 3:
+        return "Pump-Dump Anomaly"
+    elif abs(ewma_score) > 3:
+        return "Insider Trading Spike"
+    elif vol_ratio > 3:
+        return "Unusual Volume Surge"
+    else:
+        return "Normal"
+
+
 @app.get("/health")
 async def health():
     return {"status": "ok"}
@@ -88,6 +99,8 @@ async def fetch_live(
     )
     vol_ratio = float(vol_now / (vol_mean if vol_mean > 0 else 1))
 
+    risk_reason = classify_risk(ewma_score, vol_ratio)
+
     anomaly = {
         "symbol": symbol,
         "price": price_now,
@@ -95,7 +108,8 @@ async def fetch_live(
         "ewma": ewma_value,
         "ewma_zscore": ewma_score,
         "volume_ratio": vol_ratio,
-        "is_anomaly": bool(abs(ewma_score) > 3 or vol_ratio > 3),
+        "is_anomaly": risk_reason != "Normal",
+        "risk_reason": risk_reason,
         "timestamps": timestamps[-5:],
         "recent_prices": prices[-5:],
         "recent_volumes": volumes[-5:],
@@ -113,7 +127,7 @@ async def fetch_live_alert(symbol: str = Query("RELIANCE.NSE", example="RELIANCE
                 "price": data["price"],
                 "volume": data["volume"],
                 "time": data["timestamps"][-1],
-                "reason": f"EWMA z={data['ewma_zscore']:.2f}, vol ratio={data['volume_ratio']:.2f}",
+                "reason": data.get("risk_reason", f"ewma={data['ewma_zscore']:.2f}"),
             }
         )
     return data
@@ -121,7 +135,7 @@ async def fetch_live_alert(symbol: str = Query("RELIANCE.NSE", example="RELIANCE
 
 @app.get("/alerts")
 async def get_alerts():
-    return alerts[-10:]
+    return alerts[-50:]  # return more for gauge aggregation
 
 
 @app.get("/search_symbols")
@@ -140,3 +154,34 @@ async def search_symbols(query: str = Query(..., min_length=1)):
         if r.status_code != 200:
             raise HTTPException(status_code=502, detail="Search API error")
         return r.json()
+
+
+@app.get("/threat_score")
+async def threat_score():
+    """
+    Compute a threat score from recent alerts.
+    Weighting:
+      - Pump-Dump Anomaly = 30
+      - Insider Trading Spike = 25
+      - Unusual Volume Surge = 15
+    Score = sum(weights) capped at 100.
+    Level: Low <40, Medium 40-69, High >=70
+    """
+    weights = {
+        "Pump-Dump Anomaly": 30,
+        "Insider Trading Spike": 25,
+        "Unusual Volume Surge": 15,
+    }
+    total = 0
+    # consider last 50 alerts
+    for a in alerts[-50:]:
+        reason = a.get("reason", "")
+        total += weights.get(reason, 5)  # unknown reason gets small weight
+    score = min(100, int(total))
+    if score >= 70:
+        level = "High"
+    elif score >= 40:
+        level = "Medium"
+    else:
+        level = "Low"
+    return {"score": score, "level": level}
