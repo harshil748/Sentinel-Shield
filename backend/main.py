@@ -21,10 +21,13 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# optional DB engine (we won't require migrations for prototype)
+# optional DB engine (not required for prototype)
 engine = None
 if DATABASE_URL:
     engine = create_engine(DATABASE_URL, echo=False, future=True)
+
+# in-memory alert storage for demo
+alerts = []
 
 
 async def fetch_twelvedata(symbol: str, interval: str = "1min", outputsize: int = 30):
@@ -68,16 +71,13 @@ async def fetch_live(
     """
     data = await fetch_twelvedata(symbol, interval=interval, outputsize=60)
     if data is None or "values" not in data:
-        # fallback mock data (useful if you don't yet have API key)
         now = pd.Timestamp.now()
         rng = pd.date_range(end=now, periods=60, freq="T")
         prices = (100 + np.cumsum(np.random.randn(60) * 0.2)).round(2).tolist()
         volumes = (np.random.randint(100, 200, size=60)).tolist()
         timestamps = rng.astype(str).tolist()
     else:
-        vals = data[
-            "values"
-        ]  # TwelveData returns list of dicts with 'datetime','close','volume'
+        vals = data["values"]
         vals_sorted = list(reversed(vals))  # ensure chronological
         prices = [float(v["close"]) for v in vals_sorted if "close" in v]
         volumes = [int(v.get("volume", 0)) for v in vals_sorted]
@@ -87,7 +87,6 @@ async def fetch_live(
     vol_now = volumes[-1]
     ewma_score, ewma_value = compute_ewma_anomaly(prices, span=12)
 
-    # simple volume spike: ratio of current to mean of last 20
     vol_mean = (
         float(np.mean(volumes[-20:])) if len(volumes) >= 20 else float(np.mean(volumes))
     )
@@ -101,8 +100,35 @@ async def fetch_live(
         "ewma_zscore": ewma_score,
         "volume_ratio": vol_ratio,
         "is_anomaly": bool(abs(ewma_score) > 3 or vol_ratio > 3),
-        "timestamps": timestamps[-5:],  # last 5 timestamps for quick view
+        "timestamps": timestamps[-5:],  # last 5 timestamps
         "recent_prices": prices[-5:],
         "recent_volumes": volumes[-5:],
     }
     return anomaly
+
+
+@app.get("/fetch_live_alert")
+async def fetch_live_alert(symbol: str = Query("RELIANCE.NSE", example="RELIANCE.NSE")):
+    """
+    Same as /fetch_live but logs anomaly events into the alert feed.
+    """
+    data = await fetch_live(symbol)
+    if data["is_anomaly"]:
+        alerts.append(
+            {
+                "symbol": symbol,
+                "price": data["price"],
+                "volume": data["volume"],
+                "time": data["timestamps"][-1],
+                "reason": f"EWMA z={data['ewma_zscore']:.2f}, vol ratio={data['volume_ratio']:.2f}",
+            }
+        )
+    return data
+
+
+@app.get("/alerts")
+async def get_alerts():
+    """
+    Return last 10 anomaly alerts.
+    """
+    return alerts[-10:]
