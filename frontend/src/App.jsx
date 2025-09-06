@@ -177,9 +177,13 @@ function App() {
 						<p>
 							Risk: <b>{data.risk_reason || "N/A"}</b> | EWMA Z-Score:{" "}
 							{data.ewma_zscore?.toFixed(2)} | Volume Ratio:{" "}
-							{data.volume_ratio?.toFixed(2)} | Anomaly:{" "}
-							{data.is_anomaly ? "⚠️ Yes" : "✅ No"}
+							{data.volume_ratio?.toFixed(2)}
 						</p>
+						<p>
+							ML score: <b>{data.ml_score?.toFixed(3)}</b> | ML anomaly:{" "}
+							{data.ml_is_anomaly ? "⚠️ Yes" : "✅ No"}
+						</p>
+
 						<div
 							id='chart'
 							style={{
@@ -212,7 +216,9 @@ function App() {
 								<AlertTriangle size={16} color='orange' /> {a.symbol} anomaly at{" "}
 								{a.time} (Price {a.price})
 								<br />
-								<small>{a.reason}</small>
+								<small>
+									{a.reason} {a.ml_score ? `| ML:${a.ml_score.toFixed(3)}` : ""}
+								</small>
 							</li>
 						))}
 					</ul>
