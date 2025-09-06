@@ -1,44 +1,57 @@
+# Environment variables and secrets
 .env
+*.env
+.env.*
+
+# Python
 __pycache__/
 *.py[cod]
 *.pyo
 *.pyd
-*.db
-*.sqlite3
-*.log
-*.pot
-*.mo
-*.swp
-*.swo
-.DS_Store
-.vscode/
-.idea/
+*.egg-info/
+*.egg
 env/
 venv/
 ENV/
 env.bak/
 venv.bak/
-*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.dmypy.json
+.pytype/
+.pyre/
+.pyright/
+
+# Database
+*.db
+*.sqlite3
+
+# Logs
+*.log
+*.pot
+*.mo
+
+# IDE and Editor
+.DS_Store
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Build outputs
 dist/
 build/
-*.egg
-*.log
-*.sqlite3
-*.db
-*.env
-*.venv
-*.pytest_cache/
-.pytest_cache/
+node_modules/
+
+# Testing and Coverage
 .coverage
 htmlcov/
 .tox/
 .nox/
 .coverage.*
 .cache
-.env.*
-.pyre/
-.mypy_cache/
-.dmypy.json
-.pytype/
-.pyre/
-.pyright/
+
+# Temporary files
+tmp/
+*.tmp
+*.temp

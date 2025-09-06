@@ -1,339 +1,311 @@
-# Sentinel Shield: AI-Powered Market Fraud Detection Platform
+# 🛡️ Sentinel Shield
 
-## 🛡️ Project Overview
+[![Python](https://img.shields.io/badge/Python-3.12+-blue.svg)](https://www.python.org/downloads/)
+[![FastAPI](https://img.shields.io/badge/FastAPI-0.116+-green.svg)](https://fastapi.tiangolo.com/)
+[![React](https://img.shields.io/badge/React-19.1+-blue.svg)](https://reactjs.org/)
+[![License](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
 
-**Sentinel Shield** is a sophisticated, real-time AI surveillance platform designed to proactively detect and prevent market manipulation schemes in India's securities market. Developed for the Securities Market Hackathon, this prototype demonstrates advanced multi-modal intelligence fusion to protect retail investors from pump-and-dump scams and other coordinated manipulation attacks.
+> **AI-Powered Market Fraud Detection Platform for India's Securities Market**
 
-## 🎯 Mission Statement
+Sentinel Shield is a sophisticated, real-time AI surveillance platform designed to detect and prevent market manipulation schemes. Built for the Securities Market Hackathon, it protects retail investors from pump-and-dump scams through advanced multi-modal intelligence fusion.
 
-To safeguard market integrity and protect retail investors by providing regulators and market participants with cutting-edge AI-powered surveillance tools that detect fraudulent activity before it causes systemic harm.
+## 🎯 Mission
 
-## 🏗️ Architecture Overview
+Safeguard market integrity and protect retail investors by providing regulators with cutting-edge AI-powered surveillance tools that detect fraudulent activity before it causes systemic harm.
 
-Sentinel employs a **Trinity of Evidence** approach, correlating signals from three distinct intelligence streams:
+---
 
-### 1. **Social Intelligence Pipeline** 🔍
+## ⚡ Quick Start
 
-- **NLP-powered analysis** of social media and messaging platforms
-- **Real-time sentiment analysis** and manipulation pattern detection
-- **Entity recognition** for stock symbols and coordinated messaging
-- **Multi-language support** for Indian regional languages
+### Prerequisites
+- Python 3.12+
+- Node.js 20+
+- Docker & Docker Compose
 
-### 2. **Market Intelligence Engine** 📊
+### 🚀 One-Command Setup
+```bash
+# Clone the repository
+git clone https://github.com/harshil748/Sentinel-Shield.git
+cd Sentinel-Shield
 
-- **Enhanced EWMA anomaly detection** with multi-timeframe analysis
-- **Isolation Forest ML models** for sophisticated pattern recognition
-- **Volume spike detection** using statistical analysis
-- **Price momentum anomaly identification**
+# Start the database
+docker-compose up -d
 
-### 3. **Regulatory Intelligence Layer** ⚖️
+# Start backend (Terminal 1)
+cd backend && pip install -r requirements.txt && uvicorn main:app --reload --port 8000
 
-- **SEBI intermediary verification** with comprehensive trust scoring
-- **Entity credibility analysis** based on handle characteristics
-- **Risk level classification** for unverified sources
-- **Regulatory compliance status tracking**
+# Start frontend (Terminal 2)
+cd frontend && npm install && npm run dev
+```
 
-## 🚀 Key Features
+**🌐 Access the application:** http://localhost:5173
 
-### Advanced Detection Capabilities
+---
 
-- **Multi-modal correlation** of social media signals with market anomalies
-- **Real-time manipulation confidence scoring** (0-100%)
-- **Severity-based alert classification** (4 threat levels)
-- **Enhanced ML isolation forest** with feature engineering
-- **Cross-platform social media monitoring** simulation
+## 🏗️ Architecture
 
-### Intelligent Dashboard
+Sentinel Shield employs a **Trinity of Evidence** approach, correlating signals from three distinct intelligence streams:
 
-- **Live Market Threat Level** with dynamic color coding
-- **Real-time Alert Feed** with severity indicators
-- **Interactive Investigation Hub** for historical analysis
-- **Alert Deep Dive** with comprehensive forensic details
-- **CSV export functionality** for compliance reporting
+### 🔍 Social Intelligence Pipeline
+- NLP-powered analysis of social media platforms
+- Real-time sentiment analysis and manipulation detection
+- Entity recognition for coordinated messaging
+- Multi-language support for Indian markets
 
-### Trust & Verification System
+### 📊 Market Intelligence Engine
+- Enhanced EWMA anomaly detection
+- ML Isolation Forest for pattern recognition
+- Volume spike detection via statistical analysis
+- Price momentum anomaly identification
 
-- **SEBI registration verification** for financial entities
-- **Dynamic trust scoring** based on multiple factors
-- **Content analysis** for manipulation indicators
-- **Risk level assessment** (Low/Medium/High/Very High)
+### ⚖️ Regulatory Intelligence Layer
+- SEBI intermediary verification with trust scoring
+- Entity credibility analysis
+- Risk level classification
+- Regulatory compliance tracking
+
+---
 
 ## 📁 Project Structure
 
 ```
-MargdarshAI/
-├── backend/                    # FastAPI Backend
-│   ├── main.py                # Core application with AI models
-│   ├── requirements.txt       # Python dependencies
-│   ├── .env.example          # Environment configuration template
-│   └── .env                  # Environment variables (API keys)
-├── frontend/                  # React Frontend
-│   ├── src/
-│   │   ├── App.jsx           # Main dashboard component
-│   │   ├── main.jsx          # React entry point
-│   │   └── index.css         # Styling
-│   ├── package.json          # Node.js dependencies
-│   └── index.html            # HTML template
-├── docker-compose.yml         # PostgreSQL database setup
-└── README.md                 # This documentation
+Sentinel-Shield/
+├── 🔧 backend/                 # FastAPI Backend
+│   ├── main.py                 # Core AI models & API
+│   └── requirements.txt        # Python dependencies
+├── 🖥️ frontend/                # React Frontend
+│   ├── src/                    # Source code
+│   ├── package.json            # Node.js dependencies
+│   └── tailwind.config.js      # TailwindCSS config
+├── 🐳 docker-compose.yml       # PostgreSQL setup
+├── 📋 ARCHITECTURE.md          # Technical details
+└── 📚 README.md               # This file
 ```
 
 ## 🛠️ Technology Stack
 
-| Component          | Technology                       | Purpose                           |
-| ------------------ | -------------------------------- | --------------------------------- |
-| **Backend API**    | FastAPI + Python                 | High-performance async API server |
-| **AI/ML Pipeline** | Scikit-learn, TensorFlow, Pandas | Anomaly detection and NLP         |
-| **Database**       | PostgreSQL + TimescaleDB         | Time-series data storage          |
-| **Frontend**       | React.js + Vite                  | Interactive dashboard interface   |
-| **Charting**       | LightweightCharts                | Professional financial charts     |
-| **Data Sources**   | Twelve Data API                  | Real-time market data             |
-| **Deployment**     | Docker + Docker Compose          | Containerized deployment          |
+| Layer | Technology | Purpose |
+|-------|------------|---------|
+| **Backend** | FastAPI + Python 3.12 | High-performance async API |
+| **AI/ML** | Scikit-learn + Pandas + NumPy | Anomaly detection & NLP |
+| **Frontend** | React 19 + Vite + TailwindCSS | Modern dashboard interface |
+| **Charts** | LightweightCharts | Professional financial visualizations |
+| **Database** | PostgreSQL | Time-series data storage |
+| **Deployment** | Docker + Docker Compose | Containerized services |
 
-## 📊 AI Models & Algorithms
+---
 
-### 1. Enhanced EWMA Anomaly Detection
+## 🤖 AI Detection Engine
 
-- **Multi-timeframe analysis** with short/long-term EWMA
-- **Trend divergence scoring** for manipulation detection
-- **Z-score normalization** for standardized alerts
+### Enhanced EWMA Anomaly Detection
+- Multi-timeframe analysis with trend divergence scoring
+- Z-score normalization for standardized alerts
+- Real-time pattern recognition
 
-### 2. ML Isolation Forest (Enhanced)
+### ML Isolation Forest
+- Feature engineering with 5+ technical indicators
+- Multi-dimensional anomaly scoring
+- Adaptive contamination thresholds
 
-- **Feature engineering** with 5+ technical indicators
-- **Multi-dimensional anomaly scoring**
-- **Adaptive contamination thresholds**
-- **Risk-adjusted momentum analysis**
+### NLP Sentiment Analysis
+- Manipulation keyword detection with curated patterns
+- Financial context-aware sentiment scoring
+- Entity extraction for coordinated messaging
 
-### 3. NLP Sentiment Analysis Pipeline
+### Trust Scoring Algorithm
+- SEBI verification with dynamic scoring (5-95 points)
+- Content analysis for manipulation indicators
+- Risk level classification (Low/Medium/High/Critical)
 
-- **Manipulation keyword detection** using curated patterns
-- **Sentiment scoring** with financial context
-- **Entity extraction** for stock symbols and entities
-- **Urgency and greed indicator analysis**
+---
 
-### 4. Trust Scoring Algorithm
+## 🖼️ Dashboard Features
 
-- **Multi-factor authentication** verification
-- **Content analysis** for manipulation signals
-- **Handle credibility assessment**
-- **Dynamic risk level assignment**
+### 🎯 Live Market Threat Monitor
+- **Real-time threat levels:** Minimal → Low → Medium → High → Critical
+- **Dynamic color coding** for immediate risk assessment
+- **Confidence scoring** (0-100%) for manipulation detection
 
-## 🚀 Quick Start Guide
+### 📈 Interactive Charts
+- Professional financial visualizations using LightweightCharts
+- Real-time price and volume data
+- Anomaly highlighting with severity indicators
 
-### Prerequisites
+### 🔍 Investigation Hub
+- Historical alert analysis with advanced filtering
+- CSV export for compliance reporting
+- Deep forensic analysis with social media correlation
 
-- Python 3.8+
-- Node.js 16+
-- Docker & Docker Compose
-- Twelve Data API Key (free tier available)
+### ⚠️ Alert System
+- **4-tier severity classification**
+- Real-time alert feed with timestamps
+- Detailed manipulation confidence scores
 
-### 1. Clone & Setup Environment
+---
 
+## 📊 Key Endpoints
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/fetch_live_alert` | GET | Real-time analysis with alert generation |
+| `/social_analysis` | GET | Social media signal analysis |
+| `/threat_score` | GET | Current market threat assessment |
+| `/alerts` | GET | Historical alert queries with filters |
+| `/verify_entity` | GET | Entity verification & trust scoring |
+
+**📚 Full API Documentation:** http://localhost:8000/docs
+
+---
+
+## 🔧 Development & Usage
+
+### Demo Scenarios
+
+#### 🎯 Pump-and-Dump Detection
 ```bash
-git clone <repository-url>
-cd MargdarshAI
-
-# Copy environment template
-cp backend/.env.example backend/.env
-# Edit backend/.env with your Twelve Data API key
-```
-
-### 2. Start Database
-
-```bash
-docker-compose up -d
-```
-
-### 3. Start Backend
-
-```bash
-cd backend
-pip install -r requirements.txt
-uvicorn main:app --reload --port 8000
-```
-
-### 4. Start Frontend
-
-```bash
-cd frontend
-npm install
-npm run dev
-```
-
-### 5. Access Application
-
-- **Dashboard**: http://localhost:5173
-- **API Documentation**: http://localhost:8000/docs
-- **Database**: localhost:5432 (credentials in docker-compose.yml)
-
-## 🔧 API Endpoints
-
-### Core Detection Endpoints
-
-- `GET /fetch_live_alert?symbol={SYMBOL}` - Real-time analysis with alert generation
-- `GET /fetch_live?symbol={SYMBOL}` - Market data analysis without alerts
-- `GET /social_analysis?symbol={SYMBOL}` - Social media signal analysis
-
-### Investigation & Forensics
-
-- `GET /alerts` - Query historical alerts with filters
-- `GET /alerts/{alert_id}` - Detailed alert forensics
-- `GET /threat_score` - Current market threat assessment
-- `GET /leaderboard` - Most manipulated stocks (24h)
-
-### Verification & Trust
-
-- `GET /verify_entity?handle={HANDLE}` - Entity verification status
-- `GET /search_symbols?query={QUERY}` - Symbol search with suggestions
-
-## 📈 Usage Examples
-
-### Detect Real-time Manipulation
-
-```bash
+# Test real-time manipulation detection
 curl "http://localhost:8000/fetch_live_alert?symbol=RELIANCE.NSE"
 ```
 
-### Query Suspicious Activity
-
+#### 🔍 Investigation Hub
 ```bash
+# Query suspicious activity in last 24 hours
 curl "http://localhost:8000/alerts?symbol=RELIANCE.NSE&since_hours=24"
 ```
 
-### Check Market Threat Level
-
+#### 🌡️ Market Threat Assessment
 ```bash
+# Check current market threat level
 curl "http://localhost:8000/threat_score"
 ```
 
-## 🎯 Demo Scenarios
+### Environment Configuration
+```bash
+# Backend environment variables
+cd backend
+cp .env.example .env
+# Edit .env with your API keys (optional for demo mode)
+```
 
-### 1. **Pump-and-Dump Detection**
+---
 
-- Load a volatile stock (e.g., RELIANCE.NSE)
-- Observe real-time analysis with EWMA z-scores and ML anomaly flags
-- View generated social media signals and manipulation confidence
+## 🧪 Demo Mode & Simulations
 
-### 2. **Investigation Hub**
+The platform includes sophisticated simulation capabilities:
 
-- Use the Investigation Hub to filter alerts by symbol, timeframe, or source
-- Export results to CSV for compliance reporting
-- Deep dive into specific alerts for forensic analysis
+### 📈 Realistic Market Data
+- Correlated price-volume movements with manipulation spikes
+- Time-series continuity with realistic trading patterns
+- Dynamic anomaly injection for demonstration
 
-### 3. **Entity Verification**
+### 💬 Social Media Signal Simulation
+- Contextual manipulation messages based on market conditions
+- Multi-platform signal generation (Telegram, WhatsApp, Twitter)
+- Coordinated timing with market anomalies
 
-- Test different social media handles in the verification system
-- Observe trust scores and risk level classifications
-- Review entity verification in alert details
+### 🏆 Trust Scoring Demo
+- Verified vs. unverified entity scenarios
+- Content-based credibility analysis
+- Dynamic risk level assignment
 
-## 🧪 Simulated Data & Demo Mode
-
-The prototype includes sophisticated simulation capabilities for demonstration:
-
-### Realistic Market Data Generation
-
-- **Correlated price-volume movements** with manipulation spikes
-- **Time-series continuity** with realistic trading patterns
-- **Anomaly injection** for demonstration purposes
-
-### Social Media Signal Simulation
-
-- **Contextual manipulation messages** based on market conditions
-- **Multi-platform signal generation** (Telegram, WhatsApp, Twitter)
-- **Sentiment and manipulation confidence scoring**
-- **Coordinated timing** with market anomalies
-
-### Trust Scoring Demonstration
-
-- **Verified vs. unverified entity scenarios**
-- **Content-based credibility analysis**
-- **Dynamic risk level assignment**
+---
 
 ## 🎯 Impact & Use Cases
 
 ### For Regulators (SEBI)
-
-- **Proactive surveillance** of encrypted messaging platforms
-- **Evidence correlation** for enforcement actions
-- **Real-time market threat assessment**
-- **Compliance monitoring** support
+✅ Proactive surveillance of messaging platforms  
+✅ Evidence correlation for enforcement actions  
+✅ Real-time market threat assessment  
+✅ Compliance monitoring support  
 
 ### For Retail Investors
-
-- **ScamAdvisor-style warnings** for manipulated stocks
-- **Entity verification** before following advice
-- **Educational awareness** of manipulation tactics
+✅ ScamAdvisor-style warnings for manipulated stocks  
+✅ Entity verification before following advice  
+✅ Educational awareness of manipulation tactics  
 
 ### For Brokers & Exchanges
+✅ Risk management API integration  
+✅ Client activity monitoring for compliance  
+✅ Market surveillance enhancement  
 
-- **Risk management API** integration
-- **Client activity monitoring** for compliance
-- **Market surveillance** enhancement
+---
 
-## 🔮 Future Roadmap
+## 🚧 Future Roadmap
 
-### Phase 1 (Next 3 Months)
+### 📅 Phase 1 (Q1 2025)
+- [ ] Enhanced NLP for regional Indian languages
+- [ ] Expanded social media platform coverage
+- [ ] Real-time Telegram/WhatsApp integration
 
-- **Enhanced NLP models** for regional Indian languages
-- **Expanded social media platform coverage**
-- **Real-time Telegram/WhatsApp integration**
+### 📅 Phase 2 (Q2 2025)
+- [ ] Deepfake detection for audio/video manipulation
+- [ ] Broker API integration for pilot programs
+- [ ] Advanced network analysis for coordination detection
 
-### Phase 2 (6 Months)
+### 📅 Phase 3 (Q3-Q4 2025)
+- [ ] Cryptocurrency market expansion
+- [ ] Predictive manipulation modeling
+- [ ] Cross-border surveillance capabilities
 
-- **Deepfake detection module** for audio/video manipulation
-- **Broker API integration** for pilot programs
-- **Advanced network analysis** for coordination detection
-
-### Phase 3 (1 Year)
-
-- **Cryptocurrency market expansion**
-- **Predictive manipulation modeling**
-- **Cross-border surveillance capabilities**
-
-### Phase 4 (Long-term)
-
-- **SaaS platform** for global regulators
-- **AI-powered market making** supervision
-- **Quantum-resistant security** implementation
+---
 
 ## 🏆 Competitive Advantages
 
-1. **Multi-modal Intelligence Fusion** - Unique correlation of social and market signals
-2. **Real-time Processing** - Sub-second alert generation capability
-3. **Indian Market Focus** - Specialized for NSE/BSE and regional languages
-4. **Regulatory Alignment** - Direct support for SEBI priorities
-5. **Scalable Architecture** - Cloud-native design for enterprise deployment
+🎯 **Multi-modal Intelligence Fusion** - Unique correlation of social and market signals  
+⚡ **Real-time Processing** - Sub-second alert generation capability  
+🇮🇳 **Indian Market Focus** - Specialized for NSE/BSE and regional languages  
+⚖️ **Regulatory Alignment** - Direct support for SEBI priorities  
+☁️ **Scalable Architecture** - Cloud-native design for enterprise deployment  
+
+---
 
 ## 🤝 Contributing
 
-We welcome contributions to enhance Sentinel Shield's capabilities:
+We welcome contributions! Please follow these steps:
 
-1. **Fork the repository**
-2. **Create feature branch** (`git checkout -b feature/enhancement`)
-3. **Commit changes** (`git commit -am 'Add new feature'`)
-4. **Push to branch** (`git push origin feature/enhancement`)
-5. **Create Pull Request**
+1. 🍴 **Fork** the repository
+2. 🌿 **Create** a feature branch (`git checkout -b feature/enhancement`)
+3. 💾 **Commit** your changes (`git commit -m 'Add new feature'`)
+4. 📤 **Push** to the branch (`git push origin feature/enhancement`)
+5. 🔄 **Open** a Pull Request
 
-
-## 👥 Team: Praesidio Analytics
-
-**Mission**: To protect market integrity through advanced AI surveillance
-
-**Contact**: pharshil748@gmail.com
-
----
-
-## 🔗 Additional Resources
-
-- **API Documentation**: http://localhost:8000/docs (when running)
-- **Twelve Data API**: https://twelvedata.com/docs
-- **SEBI Guidelines**: https://www.sebi.gov.in/
-- **React Documentation**: https://react.dev/
-- **FastAPI Documentation**: https://fastapi.tiangolo.com/
+### Development Guidelines
+- Follow existing code style and formatting
+- Add tests for new functionality
+- Update documentation as needed
+- Ensure all checks pass before submitting
 
 ---
 
-_"Empowering regulators, protecting investors, securing markets through intelligent surveillance."_
+## 📞 Support & Contact
 
-**Sentinel Shield** - Your guardian against market manipulation.
+**Team:** Praesidio Analytics  
+**Mission:** Protecting market integrity through advanced AI surveillance  
+**Email:** pharshil748@gmail.com  
+
+### 📚 Additional Resources
+- [Technical Architecture](ARCHITECTURE.md)
+- [Project Completion Summary](COMPLETION_SUMMARY.md)
+- [API Documentation](http://localhost:8000/docs) (when running locally)
+
+---
+
+## 📄 License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+---
+
+<div align="center">
+
+### 🛡️ Sentinel Shield
+
+**"Empowering regulators, protecting investors, securing markets through intelligent surveillance."**
+
+*Your guardian against market manipulation.*
+
+[![GitHub stars](https://img.shields.io/github/stars/harshil748/Sentinel-Shield?style=social)](https://github.com/harshil748/Sentinel-Shield/stargazers)
+[![GitHub forks](https://img.shields.io/github/forks/harshil748/Sentinel-Shield?style=social)](https://github.com/harshil748/Sentinel-Shield/network/members)
+
+</div>
