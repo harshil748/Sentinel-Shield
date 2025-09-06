@@ -1,14 +1,15 @@
 import os
+import random
+import datetime
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException, Query
+from fastapi.middleware.cors import CORSMiddleware
 import httpx
 import pandas as pd
 import numpy as np
 from sqlalchemy import create_engine
-from fastapi.middleware.cors import CORSMiddleware
-
-# ML
 from sklearn.ensemble import IsolationForest
+from collections import Counter
 
 load_dotenv()
 TD_API_KEY = os.getenv("TWELVEDATA_API_KEY", "")
@@ -24,13 +25,27 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# optional DB engine
+# optional DB engine (not used in prototype)
 engine = None
 if DATABASE_URL:
     engine = create_engine(DATABASE_URL, echo=False, future=True)
 
 # in-memory alert storage
 alerts = []
+
+# Demo SEBI-registered handles (replace with real registry later)
+SEBI_REGISTERED_HANDLES = {
+    "verified_broker_official": {
+        "name": "Verified Broker Official",
+        "type": "broker",
+        "score": 95,
+    },
+    "research_analyst_xyz": {
+        "name": "Research Analyst XYZ",
+        "type": "analyst",
+        "score": 90,
+    },
+}
 
 
 async def fetch_twelvedata(symbol: str, interval: str = "1min", outputsize: int = 200):
@@ -64,47 +79,32 @@ def compute_ewma_anomaly(prices, span=10):
 
 def compute_ml_isolation_forest(prices, volumes):
     """
-    Train IsolationForest on historical points (price returns and volume).
-    Use all but last point as train and score the last point.
-    Returns: ml_score (decision_function negative => more anomalous),
-             ml_is_anomaly (bool)
+    Lightweight IsolationForest on returns + normalized volume.
+    Trains on all but last point and scores last point.
     """
     if len(prices) < 30:
-        # not enough data
         return 0.0, False
 
     df = pd.DataFrame({"price": prices, "volume": volumes}).astype(float)
-
-    # features: log returns and volume normalized
     df["ret"] = df["price"].pct_change().fillna(0)
     df["vol_norm"] = (df["volume"] - df["volume"].mean()) / (df["volume"].std() + 1e-9)
-
     features = df[["ret", "vol_norm"]].values
-
-    # train on all but last sample
     X_train = features[:-1]
     X_test = features[-1].reshape(1, -1)
 
-    # small IsolationForest for speed
     iso = IsolationForest(n_estimators=100, contamination=0.02, random_state=42)
     try:
         iso.fit(X_train)
-        # decision_function: larger is more normal, smaller (negative) more anomalous
-        score = float(iso.decision_function(X_test)[0])
+        score = float(iso.decision_function(X_test)[0])  # larger => normal
         pred = int(iso.predict(X_test)[0])  # 1 normal, -1 anomaly
         ml_is_anomaly = pred == -1
-        # convert score to positive anomaly magnitude: lower score -> higher anomaly magnitude
-        ml_score = float(-score)
+        ml_score = float(-score)  # convert so larger => more anomalous
         return ml_score, ml_is_anomaly
     except Exception:
         return 0.0, False
 
 
 def classify_risk(ewma_score: float, vol_ratio: float, ml_flag: bool):
-    """
-    Combine rule-based signals + ML flag to pick human-readable risk reason.
-    ML flag raises suspicion and amplifies categories.
-    """
     if abs(ewma_score) > 3 and vol_ratio > 3:
         base = "Pump-Dump Anomaly"
     elif abs(ewma_score) > 3:
@@ -121,6 +121,19 @@ def classify_risk(ewma_score: float, vol_ratio: float, ml_flag: bool):
     return base
 
 
+def score_trust(handle: str):
+    """
+    Prototype trust scoring using demo registry.
+    """
+    if not handle:
+        return {"registered": False, "score": 10, "entity": None}
+    key = handle.lower()
+    entry = SEBI_REGISTERED_HANDLES.get(key)
+    if entry:
+        return {"registered": True, "score": entry["score"], "entity": entry}
+    return {"registered": False, "score": 10, "entity": None}
+
+
 @app.get("/health")
 async def health():
     return {"status": "ok"}
@@ -131,29 +144,28 @@ async def fetch_live(
     symbol: str = Query(..., example="RELIANCE.NSE"), interval: str = "1min"
 ):
     """
-    Fetch recent time-series for `symbol` and return anomaly scores.
-    Uses TwelveData when TWELVEDATA_API_KEY is set. Otherwise returns mocked data.
+    Return latest anomaly evaluation for a symbol.
+    Uses TwelveData when API key configured. Otherwise returns mock time-series.
     """
     data = await fetch_twelvedata(symbol, interval=interval, outputsize=200)
     if data is None or "values" not in data:
-        # fallback mock data
         now = pd.Timestamp.now()
-        rng = pd.date_range(end=now, periods=200, freq="T")
+        rng = pd.date_range(end=now, periods=200, freq="min")
         prices = (100 + np.cumsum(np.random.randn(200) * 0.2)).round(2).tolist()
         volumes = (np.random.randint(100, 200, size=200)).tolist()
         timestamps = rng.astype(str).tolist()
     else:
         vals = data["values"]
-        vals_sorted = list(reversed(vals))  # chronological
+        vals_sorted = list(reversed(vals))
         prices = [float(v["close"]) for v in vals_sorted if "close" in v]
         volumes = [int(v.get("volume", 0)) for v in vals_sorted]
         timestamps = [v["datetime"] for v in vals_sorted]
 
-    # basic stats using most recent 60
     recent_prices = prices[-60:]
     recent_vols = volumes[-60:]
     price_now = recent_prices[-1]
     vol_now = recent_vols[-1]
+
     ewma_score, ewma_value = compute_ewma_anomaly(recent_prices, span=12)
     vol_mean = (
         float(np.mean(recent_vols[-20:]))
@@ -162,7 +174,6 @@ async def fetch_live(
     )
     vol_ratio = float(vol_now / (vol_mean if vol_mean > 0 else 1))
 
-    # ML anomaly using wider history and volumes
     ml_score, ml_is_anomaly = compute_ml_isolation_forest(prices[-200:], volumes[-200:])
 
     risk_reason = classify_risk(ewma_score, vol_ratio, ml_is_anomaly)
@@ -178,7 +189,7 @@ async def fetch_live(
         "ml_is_anomaly": ml_is_anomaly,
         "is_anomaly": (risk_reason != "Normal") or ml_is_anomaly,
         "risk_reason": risk_reason,
-        "timestamps": timestamps[-5:],  # last 5 for chart
+        "timestamps": timestamps[-5:],
         "recent_prices": prices[-5:],
         "recent_volumes": volumes[-5:],
     }
@@ -187,8 +198,19 @@ async def fetch_live(
 
 @app.get("/fetch_live_alert")
 async def fetch_live_alert(symbol: str = Query("RELIANCE.NSE", example="RELIANCE.NSE")):
+    """
+    Same as /fetch_live but logs anomaly events into in-memory alert feed.
+    """
     data = await fetch_live(symbol)
     if data["is_anomaly"]:
+        possible_handles = [
+            "verified_broker_official",
+            "random_channel_abc",
+            "research_analyst_xyz",
+            "unknown_handle_123",
+        ]
+        handle = random.choice(possible_handles)
+        trust = score_trust(handle)
         alerts.append(
             {
                 "symbol": symbol,
@@ -196,8 +218,12 @@ async def fetch_live_alert(symbol: str = Query("RELIANCE.NSE", example="RELIANCE
                 "volume": data["volume"],
                 "time": data["timestamps"][-1],
                 "reason": data.get("risk_reason", f"ewma={data['ewma_zscore']:.2f}"),
+                "source_handle": handle,
+                "trust_score": trust["score"],
+                "registered": trust["registered"],
                 "ml_score": data.get("ml_score", 0.0),
                 "ml_flag": data.get("ml_is_anomaly", False),
+                "created_at": datetime.datetime.utcnow().isoformat(),
             }
         )
     return data
@@ -211,12 +237,10 @@ async def get_alerts():
 @app.get("/search_symbols")
 async def search_symbols(query: str = Query(..., min_length=1)):
     """
-    Proxy to Twelve Data symbol_search endpoint.
-    Keeps API key hidden from frontend.
+    Proxy to TwelveData symbol_search endpoint.
     """
     if not TD_API_KEY:
         raise HTTPException(status_code=500, detail="No Twelve Data API key configured")
-
     url = "https://api.twelvedata.com/symbol_search"
     params = {"symbol": query, "apikey": TD_API_KEY}
     async with httpx.AsyncClient(timeout=10) as client:
@@ -224,6 +248,41 @@ async def search_symbols(query: str = Query(..., min_length=1)):
         if r.status_code != 200:
             raise HTTPException(status_code=502, detail="Search API error")
         return r.json()
+
+
+@app.get("/verify_entity")
+async def verify_entity(handle: str = Query(..., min_length=1)):
+    """
+    Return trust info for an entity handle (demo).
+    """
+    trust = score_trust(handle)
+    return {
+        "handle": handle,
+        "registered": trust["registered"],
+        "score": trust["score"],
+        "entity": trust["entity"],
+    }
+
+
+@app.get("/leaderboard")
+async def leaderboard(limit: int = 10):
+    """
+    Top manipulated symbols in last 24 hours based on alerts.
+    """
+    cutoff = datetime.datetime.utcnow() - datetime.timedelta(hours=24)
+    recent = []
+    for a in alerts:
+        try:
+            created = datetime.datetime.fromisoformat(a["created_at"])
+            if created >= cutoff:
+                recent.append(a)
+        except Exception:
+            # ignore parsing errors
+            pass
+    counts = Counter([a["symbol"] for a in recent])
+    top = counts.most_common(limit)
+    result = [{"symbol": s, "count": c} for s, c in top]
+    return {"top": result}
 
 
 @app.get("/threat_score")
@@ -244,7 +303,6 @@ async def threat_score():
     for a in alerts[-200:]:
         reason = a.get("reason", "")
         total += weights.get(reason, 5)
-        # also consider explicit ml_flag if present
         if a.get("ml_flag"):
             total += 5
     score = min(100, int(total))

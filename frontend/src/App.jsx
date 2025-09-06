@@ -12,6 +12,7 @@ function App() {
 	const [data, setData] = useState(null);
 	const [alerts, setAlerts] = useState([]);
 	const [threat, setThreat] = useState({ score: 0, level: "Low" });
+	const [leaderboard, setLeaderboard] = useState([]);
 
 	async function fetchAll(sym) {
 		try {
@@ -22,12 +23,14 @@ function App() {
 			);
 			setData(res.data);
 
-			const [alertRes, threatRes] = await Promise.all([
+			const [alertRes, threatRes, lbRes] = await Promise.all([
 				axios.get("http://127.0.0.1:8000/alerts"),
 				axios.get("http://127.0.0.1:8000/threat_score"),
+				axios.get("http://127.0.0.1:8000/leaderboard"),
 			]);
 			setAlerts(alertRes.data || []);
 			setThreat(threatRes.data || { score: 0, level: "Low" });
+			setLeaderboard((lbRes.data && lbRes.data.top) || []);
 		} catch (e) {
 			console.error("Error fetching:", e);
 		}
@@ -217,7 +220,10 @@ function App() {
 								{a.time} (Price {a.price})
 								<br />
 								<small>
-									{a.reason} {a.ml_score ? `| ML:${a.ml_score.toFixed(3)}` : ""}
+									{a.reason} | Source: {a.source_handle} | Trust:{" "}
+									{a.trust_score}{" "}
+									{a.registered ? "(registered)" : "(unverified)"}{" "}
+									{a.ml_score ? `| ML:${a.ml_score.toFixed(3)}` : ""}
 								</small>
 							</li>
 						))}
@@ -231,25 +237,37 @@ function App() {
 						borderRadius: "8px",
 						color: "white",
 						display: "flex",
-						justifyContent: "center",
-						alignItems: "center",
-						height: "160px",
+						flexDirection: "column",
+						gap: "12px",
 					}}>
-					<div style={{ width: "120px" }}>
-						<CircularProgressbar
-							value={threat.score}
-							text={`${threat.level}`}
-							styles={buildStyles({
-								pathColor:
-									threat.level === "High"
-										? "red"
-										: threat.level === "Medium"
-										? "orange"
-										: "green",
-								textColor: "white",
-							})}
-						/>
+					<h2>Market Threat Gauge</h2>
+					<div style={{ display: "flex", justifyContent: "center" }}>
+						<div style={{ width: "120px" }}>
+							<CircularProgressbar
+								value={threat.score}
+								text={`${threat.level}`}
+								styles={buildStyles({
+									pathColor:
+										threat.level === "High"
+											? "red"
+											: threat.level === "Medium"
+											? "orange"
+											: "green",
+									textColor: "white",
+								})}
+							/>
+						</div>
 					</div>
+
+					<h3 style={{ marginTop: "6px" }}>Top Manipulated Stocks (24h)</h3>
+					{leaderboard.length === 0 && <p>No activity</p>}
+					<ol style={{ margin: 0, paddingLeft: "16px" }}>
+						{leaderboard.map((l, idx) => (
+							<li key={idx}>
+								{l.symbol} — {l.count} alerts
+							</li>
+						))}
+					</ol>
 				</div>
 			</div>
 		</div>
