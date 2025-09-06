@@ -13,6 +13,7 @@ function App() {
 	const [alerts, setAlerts] = useState([]);
 	const [threat, setThreat] = useState({ score: 0, level: "Low" });
 	const [leaderboard, setLeaderboard] = useState([]);
+	const [liveAlerts, setLiveAlerts] = useState([]);
 
 	// Investigation hub state
 	const [invSymbol, setInvSymbol] = useState("");
@@ -34,15 +35,16 @@ function App() {
 			setData(res.data);
 
 			const [alertRes, threatRes, lbRes] = await Promise.all([
-				axios.get("http://127.0.0.1:8000/alerts"),
+				axios.get("http://127.0.0.1:8000/alerts?limit=50"),
 				axios.get("http://127.0.0.1:8000/threat_score"),
 				axios.get("http://127.0.0.1:8000/leaderboard"),
 			]);
 			setAlerts(alertRes.data || []);
+			setLiveAlerts(alertRes.data?.slice(0, 10) || []); // Show latest 10 for live feed
 			setThreat(threatRes.data || { score: 0, level: "Low" });
 			setLeaderboard((lbRes.data && lbRes.data.top) || []);
-		} catch (e) {
-			console.error("Error fetching:", e);
+		} catch (error) {
+			console.error("Error fetching:", error);
 		}
 	}
 
@@ -83,8 +85,9 @@ function App() {
 				if (res.data && res.data.data)
 					setSuggestions(res.data.data.slice(0, 8));
 				else setSuggestions([]);
-			} catch (err) {
+			} catch (error) {
 				setSuggestions([]);
+				console.error("Search error:", error);
 			}
 		} else setSuggestions([]);
 	}
@@ -274,13 +277,63 @@ function App() {
 				{data && (
 					<>
 						<div style={{ marginBottom: 8 }}>
-							Symbol: <b>{data.symbol}</b> Price: <b>{data.price}</b> Volume:{" "}
-							<b>{data.volume}</b>
+							<span style={{ fontWeight: 600 }}>Symbol:</span>{" "}
+							<b>{data.symbol}</b> |
+							<span style={{ fontWeight: 600 }}> Price:</span>{" "}
+							<b>₹{data.price}</b> |
+							<span style={{ fontWeight: 600 }}> Volume:</span>{" "}
+							<b>{data.volume?.toLocaleString()}</b>
 						</div>
-						<div style={{ marginBottom: 12 }}>
-							Risk: <b>{data.risk_reason || "N/A"}</b> EWMA z:{" "}
-							<b>{data.ewma_zscore?.toFixed(2)}</b> ML score:{" "}
+						<div style={{ marginBottom: 8 }}>
+							<span style={{ fontWeight: 600 }}>Risk Level:</span>
+							<span
+								style={{
+									color:
+										data.severity_level >= 3
+											? "#dc2626"
+											: data.severity_level >= 2
+											? "#ea580c"
+											: data.severity_level >= 1
+											? "#f59e0b"
+											: "#22c55e",
+									fontWeight: "bold",
+									marginLeft: 8,
+								}}>
+								{data.risk_reason || "Normal"}
+							</span>
+							{data.manipulation_confidence && (
+								<span style={{ marginLeft: 16 }}>
+									<span style={{ fontWeight: 600 }}>Confidence:</span>
+									<b
+										style={{
+											color:
+												data.manipulation_confidence > 70
+													? "#dc2626"
+													: data.manipulation_confidence > 40
+													? "#ea580c"
+													: "#22c55e",
+										}}>
+										{data.manipulation_confidence}%
+									</b>
+								</span>
+							)}
+						</div>
+						<div style={{ marginBottom: 12, fontSize: 14, color: "#666" }}>
+							<span style={{ fontWeight: 600 }}>EWMA Z-Score:</span>{" "}
+							<b>{data.ewma_zscore?.toFixed(2)}</b> |
+							<span style={{ fontWeight: 600 }}> Volume Ratio:</span>{" "}
+							<b>{data.volume_ratio?.toFixed(2)}x</b> |
+							<span style={{ fontWeight: 600 }}> ML Score:</span>{" "}
 							<b>{data.ml_score?.toFixed(3)}</b>
+							{data.social_signals && data.social_signals.length > 0 && (
+								<span>
+									{" "}
+									| <span style={{ fontWeight: 600 }}>
+										Social Signals:
+									</span>{" "}
+									<b>{data.social_signals.length}</b>
+								</span>
+							)}
 						</div>
 						<div
 							id='chart'
@@ -289,6 +342,7 @@ function App() {
 								height: 300,
 								background: "#fff",
 								borderRadius: 6,
+								border: "1px solid #e5e7eb",
 							}}></div>
 					</>
 				)}
@@ -435,7 +489,7 @@ function App() {
 						padding: 12,
 						borderRadius: 8,
 					}}>
-					<h4 style={{ margin: 0 }}>Market Threat</h4>
+					<h4 style={{ margin: 0 }}>Market Threat Level</h4>
 					<div
 						style={{
 							display: "flex",
@@ -449,20 +503,27 @@ function App() {
 								text={threat.level}
 								styles={buildStyles({
 									pathColor:
-										threat.level === "High"
+										threat.color ||
+										(threat.level === "Critical" || threat.level === "High"
 											? "red"
 											: threat.level === "Medium"
 											? "orange"
-											: "green",
+											: "green"),
 									textColor: "white",
+									textSize: "14px",
 								})}
 							/>
 						</div>
 						<div>
-							<div style={{ color: "#ccc" }}>Score</div>
+							<div style={{ color: "#ccc", fontSize: 12 }}>Threat Score</div>
 							<div style={{ fontSize: 20, fontWeight: 700 }}>
 								{threat.score}
 							</div>
+							{threat.details?.alerts_last_hour > 0 && (
+								<div style={{ fontSize: 11, color: "#fbbf24" }}>
+									{threat.details.alerts_last_hour} alerts/hour
+								</div>
+							)}
 						</div>
 					</div>
 				</div>
@@ -474,14 +535,107 @@ function App() {
 						padding: 12,
 						borderRadius: 8,
 					}}>
+					<h4 style={{ margin: 0, marginBottom: 8 }}>Live Alert Feed</h4>
+					<div style={{ maxHeight: 200, overflowY: "auto" }}>
+						{liveAlerts.length === 0 && (
+							<div style={{ color: "#666", fontSize: 12 }}>
+								No recent alerts
+							</div>
+						)}
+						{liveAlerts.slice(0, 5).map((alert) => (
+							<div
+								key={alert.id}
+								style={{
+									borderBottom: "1px solid #333",
+									paddingBottom: 8,
+									marginBottom: 8,
+									fontSize: 12,
+								}}>
+								<div
+									style={{
+										display: "flex",
+										justifyContent: "space-between",
+										alignItems: "center",
+										marginBottom: 4,
+									}}>
+									<span style={{ fontWeight: 600, color: "#60a5fa" }}>
+										{alert.symbol}
+									</span>
+									<span
+										style={{
+											backgroundColor:
+												alert.severity_level >= 3
+													? "#dc2626"
+													: alert.severity_level >= 2
+													? "#ea580c"
+													: alert.severity_level >= 1
+													? "#f59e0b"
+													: "#22c55e",
+											color: "white",
+											padding: "2px 6px",
+											borderRadius: 3,
+											fontSize: 10,
+										}}>
+										{alert.severity_level >= 3
+											? "HIGH"
+											: alert.severity_level >= 2
+											? "MED"
+											: alert.severity_level >= 1
+											? "LOW"
+											: "INFO"}
+									</span>
+								</div>
+								<div style={{ color: "#ccc", marginBottom: 2 }}>
+									{alert.reason?.substring(0, 40)}
+									{alert.reason?.length > 40 ? "..." : ""}
+								</div>
+								<div
+									style={{
+										display: "flex",
+										justifyContent: "space-between",
+										fontSize: 10,
+										color: "#888",
+									}}>
+									<span>Trust: {alert.trust_score}</span>
+									{alert.manipulation_confidence && (
+										<span>{alert.manipulation_confidence}% conf.</span>
+									)}
+								</div>
+							</div>
+						))}
+					</div>
+					{liveAlerts.length > 5 && (
+						<div
+							style={{
+								textAlign: "center",
+								marginTop: 8,
+								fontSize: 11,
+								color: "#60a5fa",
+								cursor: "pointer",
+							}}>
+							View all {liveAlerts.length} alerts
+						</div>
+					)}
+				</div>
+
+				<div
+					style={{
+						background: "#111",
+						color: "white",
+						padding: 12,
+						borderRadius: 8,
+					}}>
 					<h4 style={{ margin: 0 }}>Top Manipulated (24h)</h4>
-					<ol style={{ marginTop: 8 }}>
+					<ol style={{ marginTop: 8, fontSize: 13 }}>
 						{leaderboard.length === 0 && (
 							<li style={{ color: "#ccc" }}>No data</li>
 						)}
 						{leaderboard.map((l, i) => (
-							<li key={i}>
-								{l.symbol} — {l.count}
+							<li key={i} style={{ marginBottom: 4 }}>
+								<span style={{ color: "#60a5fa", fontWeight: 600 }}>
+									{l.symbol}
+								</span>
+								<span style={{ color: "#ccc" }}> — {l.count} alerts</span>
 							</li>
 						))}
 					</ol>
@@ -539,48 +693,107 @@ function App() {
 								</div>
 							</div>
 							<div style={{ width: 320 }}>
-								<h4 style={{ marginTop: 0 }}>Metrics</h4>
-								<table style={{ width: "100%", borderCollapse: "collapse" }}>
+								<h4 style={{ marginTop: 0 }}>Alert Metrics</h4>
+								<table
+									style={{
+										width: "100%",
+										borderCollapse: "collapse",
+										fontSize: 13,
+									}}>
 									<tbody>
 										<tr>
-											<td style={{ padding: 6 }}>Price</td>
-											<td style={{ padding: 6 }}>{alertDetail.alert.price}</td>
+											<td style={{ padding: 6, fontWeight: 600 }}>Symbol</td>
+											<td style={{ padding: 6 }}>{alertDetail.alert.symbol}</td>
 										</tr>
 										<tr>
-											<td style={{ padding: 6 }}>Volume</td>
-											<td style={{ padding: 6 }}>{alertDetail.alert.volume}</td>
+											<td style={{ padding: 6, fontWeight: 600 }}>Price</td>
+											<td style={{ padding: 6 }}>₹{alertDetail.alert.price}</td>
 										</tr>
 										<tr>
-											<td style={{ padding: 6 }}>Reason</td>
+											<td style={{ padding: 6, fontWeight: 600 }}>Volume</td>
+											<td style={{ padding: 6 }}>
+												{alertDetail.alert.volume?.toLocaleString()}
+											</td>
+										</tr>
+										<tr>
+											<td style={{ padding: 6, fontWeight: 600 }}>Severity</td>
+											<td style={{ padding: 6 }}>
+												<span
+													style={{
+														backgroundColor:
+															alertDetail.alert.severity_level >= 3
+																? "#dc2626"
+																: alertDetail.alert.severity_level >= 2
+																? "#ea580c"
+																: alertDetail.alert.severity_level >= 1
+																? "#f59e0b"
+																: "#22c55e",
+														color: "white",
+														padding: "2px 8px",
+														borderRadius: 4,
+														fontSize: 11,
+													}}>
+													Level {alertDetail.alert.severity_level || 1}
+												</span>
+											</td>
+										</tr>
+										<tr>
+											<td style={{ padding: 6, fontWeight: 600 }}>
+												Confidence
+											</td>
+											<td style={{ padding: 6 }}>
+												{alertDetail.alert.manipulation_confidence || "N/A"}%
+											</td>
+										</tr>
+										<tr>
+											<td style={{ padding: 6, fontWeight: 600 }}>Reason</td>
 											<td style={{ padding: 6 }}>{alertDetail.alert.reason}</td>
 										</tr>
 										<tr>
-											<td style={{ padding: 6 }}>ML flag</td>
+											<td style={{ padding: 6, fontWeight: 600 }}>ML Flag</td>
 											<td style={{ padding: 6 }}>
-												{alertDetail.alert.ml_flag ? "Yes" : "No"}
+												<span
+													style={{
+														color: alertDetail.alert.ml_flag
+															? "#dc2626"
+															: "#22c55e",
+														fontWeight: 600,
+													}}>
+													{alertDetail.alert.ml_flag ? "DETECTED" : "Clear"}
+												</span>
 											</td>
 										</tr>
 										<tr>
-											<td style={{ padding: 6 }}>ML score</td>
+											<td style={{ padding: 6, fontWeight: 600 }}>ML Score</td>
 											<td style={{ padding: 6 }}>
 												{alertDetail.alert.ml_score?.toFixed
 													? alertDetail.alert.ml_score.toFixed(3)
-													: alertDetail.alert.ml_score}
+													: alertDetail.alert.ml_score || "N/A"}
 											</td>
 										</tr>
 										<tr>
-											<td style={{ padding: 6 }}>Created</td>
+											<td style={{ padding: 6, fontWeight: 600 }}>
+												Social Signals
+											</td>
 											<td style={{ padding: 6 }}>
-												{alertDetail.alert.created_at}
+												{alertDetail.alert.social_signals_count || 0} detected
+											</td>
+										</tr>
+										<tr>
+											<td style={{ padding: 6, fontWeight: 600 }}>Created</td>
+											<td style={{ padding: 6, fontSize: 11 }}>
+												{new Date(
+													alertDetail.alert.created_at
+												).toLocaleString()}
 											</td>
 										</tr>
 									</tbody>
 								</table>
 
-								<h4 style={{ marginTop: 12 }}>Social snippets</h4>
+								<h4 style={{ marginTop: 12 }}>Social Media Intelligence</h4>
 								<div
 									style={{
-										maxHeight: 160,
+										maxHeight: 180,
 										overflowY: "auto",
 										background: "#fafafa",
 										padding: 8,
@@ -589,13 +802,134 @@ function App() {
 									{alertDetail.social_snippets.map((s, i) => (
 										<div
 											key={i}
-											style={{ padding: 6, borderBottom: "1px solid #eee" }}>
-											<div style={{ fontWeight: 600 }}>{s.handle}</div>
-											<div style={{ fontSize: 13 }}>{s.text}</div>
-											<div style={{ fontSize: 11, color: "#666" }}>{s.ts}</div>
+											style={{
+												padding: 8,
+												borderBottom: "1px solid #eee",
+												marginBottom: 6,
+												borderLeft: `3px solid ${
+													s.manipulation_confidence > 0.7
+														? "#dc2626"
+														: s.manipulation_confidence > 0.4
+														? "#f59e0b"
+														: "#22c55e"
+												}`,
+											}}>
+											<div
+												style={{
+													display: "flex",
+													justifyContent: "space-between",
+													alignItems: "center",
+													marginBottom: 4,
+												}}>
+												<div style={{ fontWeight: 600, fontSize: 13 }}>
+													{s.handle}
+													<span
+														style={{
+															marginLeft: 8,
+															fontSize: 10,
+															backgroundColor: "#e5e7eb",
+															padding: "1px 4px",
+															borderRadius: 3,
+														}}>
+														{s.platform}
+													</span>
+												</div>
+												<div style={{ fontSize: 10 }}>
+													<span
+														style={{
+															color:
+																s.manipulation_confidence > 0.7
+																	? "#dc2626"
+																	: s.manipulation_confidence > 0.4
+																	? "#f59e0b"
+																	: "#22c55e",
+															fontWeight: 600,
+														}}>
+														{(s.manipulation_confidence * 100).toFixed(0)}%
+													</span>
+												</div>
+											</div>
+											<div
+												style={{
+													fontSize: 12,
+													marginBottom: 4,
+													lineHeight: 1.4,
+												}}>
+												{s.text}
+											</div>
+											<div
+												style={{
+													display: "flex",
+													justifyContent: "space-between",
+													fontSize: 10,
+													color: "#666",
+												}}>
+												<span>{new Date(s.ts).toLocaleTimeString()}</span>
+												<span>
+													Sentiment: {(s.sentiment_score * 100).toFixed(0)}%
+												</span>
+											</div>
 										</div>
 									))}
 								</div>
+
+								{alertDetail.entity_verification && (
+									<div style={{ marginTop: 12 }}>
+										<h5 style={{ margin: 0, marginBottom: 6, fontSize: 13 }}>
+											Entity Verification
+										</h5>
+										<div
+											style={{
+												display: "flex",
+												gap: 8,
+												fontSize: 11,
+												marginBottom: 8,
+											}}>
+											<span
+												style={{
+													backgroundColor: "#22c55e",
+													color: "white",
+													padding: "2px 6px",
+													borderRadius: 3,
+												}}>
+												✓ {alertDetail.entity_verification.verified_entities}{" "}
+												Verified
+											</span>
+											<span
+												style={{
+													backgroundColor: "#f59e0b",
+													color: "white",
+													padding: "2px 6px",
+													borderRadius: 3,
+												}}>
+												⚠ {alertDetail.entity_verification.unverified_entities}{" "}
+												Unverified
+											</span>
+											<span
+												style={{
+													backgroundColor: "#dc2626",
+													color: "white",
+													padding: "2px 6px",
+													borderRadius: 3,
+												}}>
+												⚡ {alertDetail.entity_verification.high_risk_sources}{" "}
+												High Risk
+											</span>
+										</div>
+									</div>
+								)}
+
+								{alertDetail.coordination_analysis && (
+									<div style={{ marginTop: 12 }}>
+										<h5 style={{ margin: 0, marginBottom: 6, fontSize: 13 }}>
+											Coordination Analysis
+										</h5>
+										<div
+											style={{ fontSize: 11, color: "#666", lineHeight: 1.4 }}>
+											{alertDetail.coordination_analysis.network_analysis}
+										</div>
+									</div>
+								)}
 
 								<div style={{ marginTop: 12 }}>
 									<button
