@@ -8,6 +8,7 @@ import "react-circular-progressbar/dist/styles.css";
 function App() {
 	const [symbol, setSymbol] = useState("RELIANCE.NSE");
 	const [input, setInput] = useState("RELIANCE.NSE");
+	const [suggestions, setSuggestions] = useState([]);
 	const [data, setData] = useState(null);
 	const [alerts, setAlerts] = useState([]);
 	const [threat, setThreat] = useState({ score: 0, level: "Low" });
@@ -22,8 +23,11 @@ function App() {
 			const alertRes = await axios.get("http://127.0.0.1:8000/alerts");
 			setAlerts(alertRes.data);
 
-			const threatRes = await axios.get("http://127.0.0.1:8000/threat_score");
-			setThreat(threatRes.data);
+			// placeholder until we add /threat_score
+			setThreat({
+				score: alerts.length * 10,
+				level: alerts.length > 3 ? "High" : "Low",
+			});
 		} catch (e) {
 			console.error("Error fetching:", e);
 		}
@@ -52,10 +56,40 @@ function App() {
 		}
 	}, [data]);
 
+	async function handleInputChange(e) {
+		const value = e.target.value;
+		setInput(value);
+
+		if (value.length > 0) {
+			try {
+				const res = await axios.get(
+					`http://127.0.0.1:8000/search_symbols?query=${value}`
+				);
+				if (res.data && res.data.data) {
+					setSuggestions(res.data.data.slice(0, 8));
+				} else {
+					setSuggestions([]);
+				}
+			} catch (err) {
+				console.error("Search error:", err);
+				setSuggestions([]);
+			}
+		} else {
+			setSuggestions([]);
+		}
+	}
+
+	function handleSuggestionClick(s) {
+		setInput(`${s.symbol}.${s.exchange}`);
+		setSymbol(`${s.symbol}.${s.exchange}`);
+		setSuggestions([]);
+	}
+
 	function handleSubmit(e) {
 		e.preventDefault();
 		if (input.trim() !== "") {
 			setSymbol(input.trim());
+			setSuggestions([]);
 		}
 	}
 
@@ -70,17 +104,19 @@ function App() {
 			<div>
 				<h1>Sentinel Shield Dashboard</h1>
 
-				{/* Symbol search box */}
-				<form onSubmit={handleSubmit} style={{ marginBottom: "15px" }}>
+				{/* Autocomplete search */}
+				<form
+					onSubmit={handleSubmit}
+					style={{ marginBottom: "15px", position: "relative" }}>
 					<input
 						type='text'
 						value={input}
-						onChange={(e) => setInput(e.target.value)}
-						placeholder='Enter symbol e.g. TCS.NSE'
+						onChange={handleInputChange}
+						placeholder='Type company name or symbol'
 						style={{
 							padding: "6px",
 							marginRight: "10px",
-							width: "200px",
+							width: "250px",
 							borderRadius: "4px",
 							border: "1px solid #ccc",
 						}}
@@ -97,6 +133,35 @@ function App() {
 						}}>
 						Load
 					</button>
+					{suggestions.length > 0 && (
+						<ul
+							style={{
+								position: "absolute",
+								top: "38px",
+								left: 0,
+								background: "white",
+								border: "1px solid #ccc",
+								width: "250px",
+								maxHeight: "200px",
+								overflowY: "auto",
+								zIndex: 10,
+								listStyle: "none",
+								margin: 0,
+								padding: 0,
+							}}>
+							{suggestions.map((s, i) => (
+								<li
+									key={i}
+									onClick={() => handleSuggestionClick(s)}
+									style={{
+										padding: "6px",
+										cursor: "pointer",
+									}}>
+									{s.instrument_name} ({s.symbol}.{s.exchange})
+								</li>
+							))}
+						</ul>
+					)}
 				</form>
 
 				{data && (
@@ -106,8 +171,7 @@ function App() {
 							{data.volume}
 						</p>
 						<p>
-							Risk: <b>{data.risk_reason}</b> | EWMA Z-Score:{" "}
-							{data.ewma_zscore.toFixed(2)} | Volume Ratio:{" "}
+							EWMA Z-Score: {data.ewma_zscore.toFixed(2)} | Volume Ratio:{" "}
 							{data.volume_ratio.toFixed(2)} | Anomaly:{" "}
 							{data.is_anomaly ? "⚠️ Yes" : "✅ No"}
 						</p>

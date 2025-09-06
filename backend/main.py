@@ -21,10 +21,12 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# optional DB engine
 engine = None
 if DATABASE_URL:
     engine = create_engine(DATABASE_URL, echo=False, future=True)
 
+# in-memory alert storage
 alerts = []
 
 
@@ -52,17 +54,6 @@ def compute_ewma_anomaly(prices, span=10):
     resid = s - ewma
     score = (resid.iloc[-1]) / (resid.std() if resid.std() > 0 else 1e-9)
     return float(score), float(ewma.iloc[-1])
-
-
-def classify_risk(ewma_score: float, vol_ratio: float):
-    if abs(ewma_score) > 3 and vol_ratio > 3:
-        return "Pump-Dump Anomaly"
-    elif abs(ewma_score) > 3:
-        return "Insider Trading Spike"
-    elif vol_ratio > 3:
-        return "Unusual Volume Surge"
-    else:
-        return "Normal"
 
 
 @app.get("/health")
@@ -97,8 +88,6 @@ async def fetch_live(
     )
     vol_ratio = float(vol_now / (vol_mean if vol_mean > 0 else 1))
 
-    risk_reason = classify_risk(ewma_score, vol_ratio)
-
     anomaly = {
         "symbol": symbol,
         "price": price_now,
@@ -106,8 +95,7 @@ async def fetch_live(
         "ewma": ewma_value,
         "ewma_zscore": ewma_score,
         "volume_ratio": vol_ratio,
-        "is_anomaly": risk_reason != "Normal",
-        "risk_reason": risk_reason,
+        "is_anomaly": bool(abs(ewma_score) > 3 or vol_ratio > 3),
         "timestamps": timestamps[-5:],
         "recent_prices": prices[-5:],
         "recent_volumes": volumes[-5:],
@@ -125,7 +113,7 @@ async def fetch_live_alert(symbol: str = Query("RELIANCE.NSE", example="RELIANCE
                 "price": data["price"],
                 "volume": data["volume"],
                 "time": data["timestamps"][-1],
-                "reason": data["risk_reason"],
+                "reason": f"EWMA z={data['ewma_zscore']:.2f}, vol ratio={data['volume_ratio']:.2f}",
             }
         )
     return data
@@ -136,12 +124,19 @@ async def get_alerts():
     return alerts[-10:]
 
 
-@app.get("/threat_score")
-async def threat_score():
-    score = min(100, len(alerts) * 10)
-    level = "Low"
-    if score >= 70:
-        level = "High"
-    elif score >= 40:
-        level = "Medium"
-    return {"score": score, "level": level}
+@app.get("/search_symbols")
+async def search_symbols(query: str = Query(..., min_length=1)):
+    """
+    Proxy to Twelve Data symbol_search endpoint.
+    Keeps API key hidden from frontend.
+    """
+    if not TD_API_KEY:
+        raise HTTPException(status_code=500, detail="No Twelve Data API key configured")
+
+    url = "https://api.twelvedata.com/symbol_search"
+    params = {"symbol": query, "apikey": TD_API_KEY}
+    async with httpx.AsyncClient(timeout=10) as client:
+        r = await client.get(url, params=params)
+        if r.status_code != 200:
+            raise HTTPException(status_code=502, detail="Search API error")
+        return r.json()
