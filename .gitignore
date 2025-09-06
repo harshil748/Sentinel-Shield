@@ -35,3 +35,10 @@ htmlcov/
 .nox/
 .coverage.*
 .cache
+.env.*
+.pyre/
+.mypy_cache/
+.dmypy.json
+.pytype/
+.pyre/
+.pyright/
